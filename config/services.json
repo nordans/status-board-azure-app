@@ -1,0 +1,5 @@
+[
+  {"id": "public-api", "name": "Public API", "description": "Requests from web and mobile clients"},
+  {"id": "background-worker", "name": "Background worker", "description": "Asynchronous jobs and scheduled tasks"},
+  {"id": "notifications", "name": "Notifications", "description": "Email and event delivery"}
+]
