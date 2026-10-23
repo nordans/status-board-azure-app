@@ -25,14 +25,18 @@ jobs:
     name: CI
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    env:
-      PIP_DISABLE_PIP_VERSION_CHECK: "1"
     steps:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Validate GitHub Actions workflows
+        run: >-
+          docker run --rm --network none
+          --volume "$PWD:/repo:ro" --workdir /repo
+          rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
 
       - name: Scan git history for secrets
         run: >-
@@ -41,37 +45,43 @@ jobs:
           ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
           git /repo --redact --no-banner --log-opts="--all"
 
-      - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+      - name: Set up uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
         with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: |
-            requirements.txt
-            requirements-dev.txt
+          version: "0.13.5"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Check dependency lock
+        run: uv lock --check
 
       - name: Install dependencies
-        run: python -m pip install --require-hashes -r requirements-dev.txt
+        run: uv sync --locked
 
       - name: Lint Python
-        run: python -m ruff check .
+        run: uv run --locked --no-sync ruff check .
 
       - name: Check Python formatting
-        run: python -m ruff format --check .
+        run: uv run --locked --no-sync ruff format --check .
 
       - name: Run tests
-        run: python -m pytest
+        run: uv run --locked --no-sync pytest
 
       - name: Audit dependencies
-        run: python -m pip_audit --require-hashes -r requirements-dev.txt
+        run: |
+          uv export --locked --all-groups --no-emit-project --no-header --no-annotate --quiet --output-file "$RUNNER_TEMP/requirements-audit.txt"
+          uv run --locked --no-sync pip-audit --strict --disable-pip --require-hashes -r "$RUNNER_TEMP/requirements-audit.txt"
 
-      # Build application images on demand to conserve CI minutes during development.
+      # Keep application image builds opt-in to avoid unnecessary development runs.
       - name: Build image and run container smoke tests
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_image }}
         run: |
-          python scripts/new_local_secret.py
+          uv run --locked --no-sync python scripts/new_local_secret.py
           docker compose up --build --detach --wait --wait-timeout 90
-          python scripts/smoke_test.py
+          uv run --locked --no-sync python scripts/smoke_test.py
           test "$(docker compose exec -T status-board id -u)" = "10001"
 
       - name: Stop containers

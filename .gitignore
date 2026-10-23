@@ -15,3 +15,4 @@ htmlcov/
 .vscode/
 artifacts/
 .cache/
+requirements-audit.txt

@@ -1,5 +1,7 @@
 **
-!requirements.txt
+!pyproject.toml
+!uv.lock
+!.python-version
 !app/
 !app/**
 !config/
