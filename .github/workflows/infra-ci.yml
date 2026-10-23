@@ -35,15 +35,21 @@ jobs:
         run: terraform fmt -check -recursive infra
 
       - name: Validate Terraform configurations
+        env:
+          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/terraform-providers
         run: |
-          for root in infra/bootstrap infra/environments/dev; do
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
+          for module in infra/modules/*; do
+            cp infra/environments/dev/.terraform.lock.hcl "$module/.terraform.lock.hcl"
+          done
+          for root in infra/bootstrap infra/environments/dev infra/modules/*; do
             terraform -chdir="$root" init -backend=false -input=false -lockfile=readonly
             terraform -chdir="$root" validate -no-color
           done
 
       - name: Test infrastructure security boundaries
         run: |
-          for root in infra/bootstrap infra/environments/dev; do
+          for root in infra/bootstrap infra/environments/dev infra/modules/*; do
             terraform -chdir="$root" test -no-color
           done
 

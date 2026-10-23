@@ -5,22 +5,22 @@ output "resource_group_name" {
 
 output "aks_name" {
   description = "AKS cluster name."
-  value       = azurerm_kubernetes_cluster.platform.name
+  value       = module.aks.name
 }
 
 output "acr_login_server" {
   description = "Registry endpoint for application images."
-  value       = azurerm_container_registry.app.login_server
+  value       = module.registry.login_server
 }
 
 output "key_vault_name" {
   description = "Key Vault used for application secrets."
-  value       = azurerm_key_vault.app.name
+  value       = module.key_vault.name
 }
 
 output "workload_identity_client_id" {
   description = "Client ID for the Kubernetes service account annotation and CSI configuration."
-  value       = azurerm_user_assigned_identity.app.client_id
+  value       = module.workload_identity.client_id
 }
 
 output "tenant_id" {

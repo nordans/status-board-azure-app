@@ -1,22 +1,22 @@
 resource "azurerm_user_assigned_identity" "cluster" {
-  name                = "id-${local.name}-aks"
-  resource_group_name = data.azurerm_resource_group.platform.name
+  name                = "id-${var.name_prefix}-aks"
+  resource_group_name = var.resource_group_name
   location            = var.location
-  tags                = local.tags
+  tags                = var.tags
 }
 
 resource "azurerm_role_assignment" "cluster_network" {
-  scope                = azurerm_subnet.nodes.id
+  scope                = var.subnet_id
   role_definition_name = "Network Contributor"
   principal_id         = azurerm_user_assigned_identity.cluster.principal_id
   principal_type       = "ServicePrincipal"
 }
 
 resource "azurerm_user_assigned_identity" "kubelet" {
-  name                = "id-${local.name}-kubelet"
-  resource_group_name = data.azurerm_resource_group.platform.name
+  name                = "id-${var.name_prefix}-kubelet"
+  resource_group_name = var.resource_group_name
   location            = var.location
-  tags                = local.tags
+  tags                = var.tags
 }
 
 resource "azurerm_role_assignment" "cluster_kubelet" {
@@ -27,17 +27,17 @@ resource "azurerm_role_assignment" "cluster_kubelet" {
 }
 
 resource "azurerm_role_assignment" "image_pull" {
-  scope                = azurerm_container_registry.app.id
+  scope                = var.registry_id
   role_definition_name = "AcrPull"
   principal_id         = azurerm_user_assigned_identity.kubelet.principal_id
   principal_type       = "ServicePrincipal"
 }
 
 resource "azurerm_kubernetes_cluster" "platform" {
-  name                              = "aks-${local.name}"
-  resource_group_name               = data.azurerm_resource_group.platform.name
+  name                              = var.name
+  resource_group_name               = var.resource_group_name
   location                          = var.location
-  dns_prefix                        = local.name
+  dns_prefix                        = var.name_prefix
   kubernetes_version                = var.kubernetes_version
   sku_tier                          = "Free"
   automatic_upgrade_channel         = "patch"
@@ -46,7 +46,7 @@ resource "azurerm_kubernetes_cluster" "platform" {
   role_based_access_control_enabled = true
   oidc_issuer_enabled               = true
   workload_identity_enabled         = true
-  tags                              = local.tags
+  tags                              = var.tags
 
   node_provisioning_profile {
     mode               = "Manual"
@@ -57,13 +57,13 @@ resource "azurerm_kubernetes_cluster" "platform" {
     name                        = "system"
     temporary_name_for_rotation = "systemtmp"
     vm_size                     = var.node_vm_size
-    node_count                  = 2
-    vnet_subnet_id              = azurerm_subnet.nodes.id
+    node_count                  = var.node_count
+    vnet_subnet_id              = var.subnet_id
     max_pods                    = 30
     os_sku                      = "Ubuntu"
     os_disk_type                = "Managed"
     os_disk_size_gb             = 64
-    tags                        = local.tags
+    tags                        = var.tags
 
     upgrade_settings {
       max_surge = "1"
@@ -82,13 +82,13 @@ resource "azurerm_kubernetes_cluster" "platform" {
   }
 
   api_server_access_profile {
-    authorized_ip_ranges = var.aks_api_authorized_cidrs
+    authorized_ip_ranges = var.api_authorized_cidrs
   }
 
   azure_active_directory_role_based_access_control {
-    tenant_id              = data.azurerm_client_config.current.tenant_id
+    tenant_id              = var.tenant_id
     azure_rbac_enabled     = true
-    admin_group_object_ids = var.aks_admin_group_object_ids
+    admin_group_object_ids = var.admin_group_object_ids
   }
 
   key_vault_secrets_provider {
@@ -101,9 +101,9 @@ resource "azurerm_kubernetes_cluster" "platform" {
     network_plugin_mode = "overlay"
     network_data_plane  = "cilium"
     network_policy      = "cilium"
-    pod_cidr            = "10.244.0.0/16"
-    service_cidr        = "10.43.0.0/16"
-    dns_service_ip      = "10.43.0.10"
+    pod_cidr            = var.pod_cidr
+    service_cidr        = var.service_cidr
+    dns_service_ip      = var.dns_service_ip
     load_balancer_sku   = "standard"
     outbound_type       = "loadBalancer"
   }

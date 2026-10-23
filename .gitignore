@@ -27,3 +27,4 @@ crash.log
 crash.*.log
 .tflint.d/
 /infra/bootstrap/backend.tf
+/infra/modules/**/.terraform.lock.hcl

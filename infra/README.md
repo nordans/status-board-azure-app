@@ -7,6 +7,23 @@ Terraform provisions an AKS development platform. Application manifests, image p
 | `bootstrap` | State resource group, Storage Account, private Blob container and development resource group | Local initially; migrate to Blob after provisioning |
 | `environments/dev` | VNet, node subnet, AKS, ACR, Key Vault, managed identities, workload federation and role assignments | Azure Blob |
 
+## Modules
+
+Root configurations select environment settings, configure the provider and backend, and connect modules through their outputs. Child modules inherit the provider and declare their own inputs and outputs.
+
+| Module | Responsibility | Outputs used by callers |
+| --- | --- | --- |
+| [network](modules/network/README.md) | VNet and node subnet with the Key Vault service endpoint | `node_subnet_id` |
+| [container-registry](modules/container-registry/README.md) | Authenticated image registry | `id`, `login_server` |
+| [key-vault](modules/key-vault/README.md) | Vault, network allowlist and recovery settings | `id`, `name` |
+| [aks](modules/aks/README.md) | Cluster, control-plane and kubelet identities, and their scoped roles | `name`, `oidc_issuer_url` |
+| [workload-identity](modules/workload-identity/README.md) | Service account federation and read-only vault access | `client_id` |
+| [state-backend](modules/state-backend/README.md) | Protected state storage and Blob container | `storage_account_name`, `container_name`, `container_id` |
+
+`environments/dev/main.tf` wires the subnet and registry into AKS, then the AKS issuer and vault into workload identity. `bootstrap/main.tf` owns the resource groups and calls `state-backend`. Names, network ranges and node settings are selected by the roots. Module READMEs link to typed input declarations and list outputs.
+
+The roots retain `moved` blocks for resources extracted into modules. Existing state is migrated to the new addresses during the next plan/apply. Review any proposed resource replacement before applying.
+
 ## Requirements
 
 - Terraform 1.17.x; CI uses 1.17.0.
@@ -85,24 +102,26 @@ For automated Terraform access, set `ARM_USE_OIDC=true`, `ARM_USE_AZUREAD=true`,
 
 ## Validation
 
-The `Infrastructure CI` workflow runs on every PR to `main`, push to `main` and manual dispatch. It has only `contents: read` permission and does not authenticate to Azure. Both roots use `init -backend=false -lockfile=readonly`; provider changes require an intentional lockfile update. Lockfiles include Linux AMD64 and Windows AMD64 checksums.
+The `Infrastructure CI` workflow runs on every PR to `main`, push to `main` and manual dispatch. It has only `contents: read` permission and does not authenticate to Azure. Both roots and all six child modules are independently initialized and validated. CI copies the development root lockfile into child module working directories before using `init -backend=false -lockfile=readonly`; the roots own committed provider selections. Provider changes require an intentional lockfile update. Lockfiles include Linux AMD64 and Windows AMD64 checksums.
 
 ```sh
 terraform fmt -check -recursive infra
-terraform -chdir=infra/bootstrap init -backend=false -lockfile=readonly
-terraform -chdir=infra/bootstrap validate
-terraform -chdir=infra/bootstrap test
-terraform -chdir=infra/environments/dev init -backend=false -lockfile=readonly
-terraform -chdir=infra/environments/dev validate
-terraform -chdir=infra/environments/dev test
+for module in infra/modules/*; do
+  cp infra/environments/dev/.terraform.lock.hcl "$module/.terraform.lock.hcl"
+done
+for root in infra/bootstrap infra/environments/dev infra/modules/*; do
+  terraform -chdir="$root" init -backend=false -lockfile=readonly
+  terraform -chdir="$root" validate
+  terraform -chdir="$root" test
+done
 tflint --init --config "$PWD/infra/.tflint.hcl"
 tflint --recursive --chdir=infra --config "$PWD/infra/.tflint.hcl"
 docker run --rm --volume "${PWD}:/repo:ro" --workdir /repo aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c config --severity HIGH,CRITICAL --exit-code 1 --ignorefile infra/.trivyignore.yaml infra
 ```
 
-Terraform tests mock Azure and check authentication, network restrictions, recovery settings and invalid inputs. They do not prove quota, regional availability or successful Azure provisioning. A real authenticated plan and deployment remain required.
+The validation block above uses a POSIX shell. Terraform tests mock Azure: module tests check authentication, network restrictions, scoped role assignments, recovery settings and invalid inputs; root tests check the environment contracts and input validation. They do not prove quota, regional availability or successful Azure provisioning. A real authenticated plan and deployment remain required.
 
-The scoped Trivy exception in `.trivyignore.yaml` keeps trusted-service firewall bypass disabled on state storage. It applies only to the bootstrap storage rule, carries a justification and expires on 2027-01-31. Other high and critical findings fail CI. Trivy downloads current checks when scanning.
+The scoped Trivy exception in `.trivyignore.yaml` keeps trusted-service firewall bypass disabled on state storage. It applies only to the storage rule in `modules/state-backend/main.tf`, carries a justification and expires on 2027-01-31. Other high and critical findings fail CI. Trivy downloads current checks when scanning.
 
 ## Operations
 
