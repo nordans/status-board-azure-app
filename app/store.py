@@ -75,12 +75,14 @@ class BoardStore:
             updated = current.model_copy(update={**update.model_dump(), "updated_at": now})
             self._services[service_id] = updated
             self._revision += 1
-            self._events.appendleft(Event(
-                id=self._revision,
-                service_id=service_id,
-                service_name=current.name,
-                status=update.status,
-                message=update.message,
-                created_at=now,
-            ))
+            self._events.appendleft(
+                Event(
+                    id=self._revision,
+                    service_id=service_id,
+                    service_name=current.name,
+                    status=update.status,
+                    message=update.message,
+                    created_at=now,
+                )
+            )
             return updated.model_copy()

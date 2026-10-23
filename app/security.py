@@ -25,7 +25,9 @@ def verify_token(path: Path, supplied: str | None) -> None:
     try:
         expected = read_token(path)
     except TokenUnavailable:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Admin authentication unavailable") from None
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "Admin authentication unavailable"
+        ) from None
     if supplied is None or not secrets.compare_digest(supplied.encode("utf-8"), expected):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,

@@ -123,3 +123,22 @@ python -m pytest
 ```
 
 Use the Python executable from `.venv` when the environment is not activated.
+
+## Continuous integration
+
+The `CI` workflow runs on pull requests targeting `main`, pushes to `main` and manual dispatch. It scans Git history with Gitleaks, runs Ruff lint and formatting checks, executes pytest and audits locked dependencies with pip-audit.
+
+Application images are built only when manually requested. In **Actions → CI → Run workflow**, select a branch and enable `build_image` to build the image and run container smoke tests. The option defaults to `false`. The workflow does not publish images.
+
+Use the `CI` status check in branch protection. Manual dispatch becomes available after the workflow is merged into the default branch.
+
+Run the Python checks locally:
+
+```sh
+python -m ruff check .
+python -m ruff format --check .
+python -m pytest
+python -m pip_audit --require-hashes -r requirements-dev.txt
+```
+
+With the container running, execute `python scripts/smoke_test.py` to verify the HTTP API. This submits a status report for the first configured service.

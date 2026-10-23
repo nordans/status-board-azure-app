@@ -2,3 +2,5 @@
 -r requirements.in
 httpx2>=2.13,<3
 pytest>=8,<10
+ruff>=0.17,<1
+pip-audit>=2.10,<3
