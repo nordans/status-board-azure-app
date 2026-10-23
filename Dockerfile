@@ -1,9 +1,14 @@
+FROM ghcr.io/astral-sh/uv@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff AS uv
+
 FROM python:3.12-slim-bookworm AS builder
-ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
+COPY --from=uv /uv /usr/local/bin/uv
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never
 WORKDIR /build
-COPY requirements.txt .
-RUN python -m venv /opt/venv \
-    && /opt/venv/bin/pip install --require-hashes -r requirements.txt
+COPY pyproject.toml uv.lock .python-version ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-install-project --python /usr/local/bin/python
 
 FROM python:3.12-slim-bookworm AS runtime
 ENV PATH="/opt/venv/bin:$PATH" \

@@ -5,7 +5,7 @@ Service status dashboard with a public read API and authenticated status updates
 ## Requirements
 
 - Docker Desktop with Linux containers, or Docker Engine with Compose v2 or later.
-- Python 3.12 for development without Docker.
+- [uv 0.13.5](https://docs.astral.sh/uv/getting-started/installation/) for local development. Python 3.12 is selected by `.python-version` and can be installed with uv.
 
 ## Run with Docker
 
@@ -108,37 +108,44 @@ The container runs as UID/GID `10001:10001` with a read-only root filesystem. Lo
 ## Development
 
 ```powershell
-py -3.12 -m venv .venv
-./.venv/Scripts/python.exe -m pip install --require-hashes -r requirements-dev.txt
-./scripts/New-LocalSecret.ps1
-./.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log --no-proxy-headers
+uv python install
+uv sync --locked
+uv run --locked python scripts/new_local_secret.py
+uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log --no-proxy-headers
 ```
 
-On Linux or macOS, use `python3.12 -m venv .venv`, `.venv/bin/python` and `python3 scripts/new_local_secret.py`. Compose reads `.env` automatically; direct Python runs use the process environment.
+These commands work on Windows, Linux and macOS. Compose reads `.env` automatically; direct Python runs use the process environment.
+
+Dependencies are declared in `pyproject.toml` and resolved in `uv.lock`. The `dev` group contains test, lint and audit tools. `uv sync --locked` creates or updates `.venv` without changing the lockfile. Docker installs only runtime dependencies with `uv sync --locked --no-dev`.
 
 Run tests:
 
 ```sh
-python -m pytest
+uv run --locked pytest
 ```
 
-Use the Python executable from `.venv` when the environment is not activated.
+Add dependencies with `uv add <package>` or `uv add --dev <package>`. Use `uv lock --upgrade-package <package>` for a targeted update. Commit both `pyproject.toml` and `uv.lock` when dependencies change.
 
 ## Continuous integration
 
-The `CI` workflow runs on pull requests targeting `main`, pushes to `main` and manual dispatch. It scans Git history with Gitleaks, runs Ruff lint and formatting checks, executes pytest and audits locked dependencies with pip-audit.
+The `CI` workflow runs on pull requests targeting `main`, pushes to `main` and manual dispatch. It validates workflow files with actionlint, scans Git history with Gitleaks, verifies `uv.lock`, runs Ruff lint and formatting checks, executes pytest and audits locked dependencies with pip-audit.
 
 Application images are built only when manually requested. In **Actions → CI → Run workflow**, select a branch and enable `build_image` to build the image and run container smoke tests. The option defaults to `false`. The workflow does not publish images.
 
-Use the `CI` status check in branch protection. Manual dispatch becomes available after the workflow is merged into the default branch.
+Use the `CI` status check in branch protection.
 
 Run the Python checks locally:
 
 ```sh
-python -m ruff check .
-python -m ruff format --check .
-python -m pytest
-python -m pip_audit --require-hashes -r requirements-dev.txt
+uv lock --check
+uv sync --locked
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked pytest
+uv export --locked --all-groups --no-emit-project --no-header --no-annotate --quiet --output-file requirements-audit.txt
+uv run --locked pip-audit --strict --disable-pip --require-hashes -r requirements-audit.txt
 ```
 
-With the container running, execute `python scripts/smoke_test.py` to verify the HTTP API. This submits a status report for the first configured service.
+`requirements-audit.txt` is a generated audit input excluded from Git. CI exports it to runner temporary storage. `uv.lock` is the project's dependency lockfile.
+
+With the container running, execute `uv run --locked python scripts/smoke_test.py` to verify the HTTP API. This submits a status report for the first configured service.
