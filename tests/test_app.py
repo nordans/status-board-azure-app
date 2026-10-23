@@ -1,5 +1,6 @@
 import logging
 import secrets
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -31,16 +32,22 @@ def test_public_board_starts_unknown_and_exposes_no_secret(running, environment)
     data = response.json()
     assert data["version"] == "test-sha"
     assert len(data["services"]) == 3
-    assert all(item["status"] == "unknown" and item["updated_at"] is None for item in data["services"])
+    assert all(
+        item["status"] == "unknown" and item["updated_at"] is None for item in data["services"]
+    )
     assert data["events"] == []
     assert environment[1] not in response.text
     assert "token_file" not in response.text
 
 
-@pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer incorrect"}, {"Authorization": "Basic incorrect"}])
+@pytest.mark.parametrize(
+    "headers", [{}, {"Authorization": "Bearer incorrect"}, {"Authorization": "Basic incorrect"}]
+)
 def test_writes_require_a_valid_bearer_token(running, headers):
     client, _, _ = running
-    response = client.put("/api/services/public-api/status", json={"status": "outage"}, headers=headers)
+    response = client.put(
+        "/api/services/public-api/status", json={"status": "outage"}, headers=headers
+    )
     assert response.status_code == 401
     assert response.headers["www-authenticate"] == "Bearer"
     assert client.get("/api/status").json()["events"] == []
@@ -48,9 +55,15 @@ def test_writes_require_a_valid_bearer_token(running, headers):
 
 def test_valid_update_changes_public_state_and_records_event(running):
     client, _, headers = running
-    response = client.put("/api/services/public-api/status", headers=headers, json={
-        "status": "degraded", "message": "Investigating elevated latency", "response_time_ms": 240,
-    })
+    response = client.put(
+        "/api/services/public-api/status",
+        headers=headers,
+        json={
+            "status": "degraded",
+            "message": "Investigating elevated latency",
+            "response_time_ms": 240,
+        },
+    )
     assert response.status_code == 200
     snapshot = client.get("/api/status").json()
     assert snapshot["services"][0]["status"] == "degraded"
@@ -67,8 +80,17 @@ def test_atomic_token_rotation_rejects_old_and_accepts_new_token(running, tmp_pa
     replacement.write_text(new_token + "\n", encoding="ascii")
     replacement.replace(settings.token_file)
     endpoint = "/api/services/public-api/status"
-    assert client.put(endpoint, headers=old_headers, json={"status": "operational"}).status_code == 401
-    assert client.put(endpoint, headers={"Authorization": f"Bearer {new_token}"}, json={"status": "operational"}).status_code == 200
+    assert (
+        client.put(endpoint, headers=old_headers, json={"status": "operational"}).status_code == 401
+    )
+    assert (
+        client.put(
+            endpoint,
+            headers={"Authorization": f"Bearer {new_token}"},
+            json={"status": "operational"},
+        ).status_code
+        == 200
+    )
 
 
 @pytest.mark.parametrize("file_state", ["missing", "empty", "invalid", "oversized"])
@@ -77,11 +99,15 @@ def test_unavailable_secret_fails_closed_but_process_remains_alive(running, file
     if file_state == "missing":
         settings.token_file.unlink()
     else:
-        settings.token_file.write_text({"empty": "", "invalid": "short", "oversized": "x" * 1025}[file_state], encoding="ascii")
+        settings.token_file.write_text(
+            {"empty": "", "invalid": "short", "oversized": "x" * 1025}[file_state], encoding="ascii"
+        )
     assert client.get("/health/live").status_code == 200
     assert client.get("/health/ready").status_code == 503
     assert client.get("/api/status").status_code == 200
-    response = client.put("/api/services/public-api/status", headers=headers, json={"status": "operational"})
+    response = client.put(
+        "/api/services/public-api/status", headers=headers, json={"status": "operational"}
+    )
     assert response.status_code == 503
     assert str(settings.token_file) not in response.text
 
@@ -98,29 +124,44 @@ def test_invalid_or_missing_initial_secret_prevents_startup(environment, value):
             pass
 
 
-@pytest.mark.parametrize("payload", [
-    {"status": "broken"},
-    {"status": "operational", "response_time_ms": -1},
-    {"status": "operational", "response_time_ms": 1.5},
-    {"status": "operational", "response_time_ms": True},
-    {"status": "operational", "message": "x" * 241},
-    {"status": "operational", "unexpected": "field"},
-])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"status": "broken"},
+        {"status": "operational", "response_time_ms": -1},
+        {"status": "operational", "response_time_ms": 1.5},
+        {"status": "operational", "response_time_ms": True},
+        {"status": "operational", "message": "x" * 241},
+        {"status": "operational", "unexpected": "field"},
+    ],
+)
 def test_invalid_report_is_rejected_without_changing_state(running, payload):
     client, _, headers = running
-    assert client.put("/api/services/public-api/status", headers=headers, json=payload).status_code == 422
+    assert (
+        client.put("/api/services/public-api/status", headers=headers, json=payload).status_code
+        == 422
+    )
     assert client.get("/api/status").json()["events"] == []
 
 
 def test_unknown_component_returns_404(running):
     client, _, headers = running
-    assert client.put("/api/services/does-not-exist/status", headers=headers, json={"status": "operational"}).status_code == 404
+    assert (
+        client.put(
+            "/api/services/does-not-exist/status", headers=headers, json={"status": "operational"}
+        ).status_code
+        == 404
+    )
 
 
 def test_event_history_is_bounded_and_newest_first(running):
     client, _, headers = running
     for index in range(55):
-        client.put("/api/services/public-api/status", headers=headers, json={"status": "operational", "message": f"Report {index}"})
+        client.put(
+            "/api/services/public-api/status",
+            headers=headers,
+            json={"status": "operational", "message": f"Report {index}"},
+        )
     events = client.get("/api/status").json()["events"]
     assert len(events) == 50
     assert events[0]["message"] == "Report 54"
@@ -136,7 +177,11 @@ def test_readiness_is_independent_of_reported_service_outages(running):
 def test_process_restart_resets_state(environment):
     settings, token = environment
     with TestClient(create_app(settings)) as client:
-        client.put("/api/services/public-api/status", headers={"Authorization": f"Bearer {token}"}, json={"status": "outage"})
+        client.put(
+            "/api/services/public-api/status",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"status": "outage"},
+        )
     with TestClient(create_app(settings)) as client:
         assert client.get("/api/status").json()["services"][0]["status"] == "unknown"
 
@@ -144,8 +189,14 @@ def test_process_restart_resets_state(environment):
 def test_requests_do_not_log_headers_body_or_query_values(running, caplog, environment):
     client, _, headers = running
     with caplog.at_level(logging.INFO, logger="status_board"):
-        client.put("/api/services/public-api/status?do_not_log=query-marker", headers=headers, json={"status": "operational", "message": "body-marker"})
-    application_logs = "\n".join(record.message for record in caplog.records if record.name == "status_board")
+        client.put(
+            "/api/services/public-api/status?do_not_log=query-marker",
+            headers=headers,
+            json={"status": "operational", "message": "body-marker"},
+        )
+    application_logs = "\n".join(
+        record.message for record in caplog.records if record.name == "status_board"
+    )
     assert "http_request" in application_logs
     assert environment[1] not in application_logs
     assert "body-marker" not in application_logs
@@ -165,6 +216,7 @@ def test_dashboard_and_assets_are_served_with_security_headers(running):
 def test_unicode_credentials_are_rejected_without_crashing(environment):
     settings, _ = environment
     from fastapi import HTTPException
+
     with pytest.raises(HTTPException) as error:
         verify_token(settings.token_file, "zażółć")
     assert error.value.status_code == 401
@@ -172,7 +224,10 @@ def test_unicode_credentials_are_rejected_without_crashing(environment):
 
 def test_duplicate_service_configuration_is_rejected(tmp_path):
     config_file = tmp_path / "services.json"
-    config_file.write_text('[{"id":"api","name":"API","description":""},{"id":"api","name":"Again","description":""}]', encoding="utf-8")
+    config_file.write_text(
+        '[{"id":"api","name":"API","description":""},{"id":"api","name":"Again","description":""}]',
+        encoding="utf-8",
+    )
     with pytest.raises(ValueError, match="unique"):
         load_services(config_file)
 
