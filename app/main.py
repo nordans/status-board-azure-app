@@ -11,6 +11,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
+
 from app.config import Settings, load_services
 from app.security import TokenUnavailable, read_token, verify_token
 from app.store import BoardSnapshot, BoardStore, Service, StatusUpdate, utc_now
@@ -44,8 +45,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         logger.info(json.dumps({"event": "application_stopped"}))
 
     application = FastAPI(
-        title="Status Board API", version=settings.version, lifespan=lifespan,
-        docs_url=None, redoc_url=None,
+        title="Status Board API",
+        version=settings.version,
+        lifespan=lifespan,
+        docs_url=None,
+        redoc_url=None,
     )
 
     @application.middleware("http")
@@ -63,11 +67,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers["Cache-Control"] = "no-store"
         route = request.scope.get("route")
         route_path = getattr(route, "path", "unmatched")
-        logger.info(json.dumps({
-            "event": "http_request", "method": request.method, "route": route_path,
-            "status": response.status_code,
-            "duration_ms": round((time.perf_counter() - started) * 1000, 2),
-        }))
+        logger.info(
+            json.dumps(
+                {
+                    "event": "http_request",
+                    "method": request.method,
+                    "route": route_path,
+                    "status": response.status_code,
+                    "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+                }
+            )
+        )
         return response
 
     def require_admin(
@@ -91,15 +101,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def board(request: Request) -> BoardResponse:
         snapshot = request.app.state.store.snapshot()
         return BoardResponse(
-            **snapshot.model_dump(), title=settings.title, version=settings.version,
-            environment=settings.environment, instance=socket.gethostname(),
+            **snapshot.model_dump(),
+            title=settings.title,
+            version=settings.version,
+            environment=settings.environment,
+            instance=socket.gethostname(),
             uptime_seconds=int(time.monotonic() - request.app.state.started),
             generated_at=utc_now().isoformat(),
         )
 
     @application.put(
-        "/api/services/{service_id}/status", response_model=Service,
-        dependencies=[Depends(require_admin)], tags=["status"],
+        "/api/services/{service_id}/status",
+        response_model=Service,
+        dependencies=[Depends(require_admin)],
+        tags=["status"],
     )
     def update_status(service_id: str, update: StatusUpdate, request: Request) -> Service:
         try:
