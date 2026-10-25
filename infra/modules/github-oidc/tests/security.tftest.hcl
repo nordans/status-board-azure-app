@@ -55,6 +55,7 @@ run "repository_and_environment_trust" {
     condition = (
       !contains(azurerm_role_definition.deploy.permissions[0].actions, "*") &&
       !contains(azurerm_role_definition.deploy.permissions[0].actions, "Microsoft.Authorization/roleAssignments/write") &&
+      contains(azurerm_role_definition.deploy.permissions[0].actions, "Microsoft.ContainerRegistry/registries/operationStatuses/read") &&
       toset(azurerm_role_definition.backend_network.permissions[0].actions) == toset(["Microsoft.Storage/storageAccounts/read", "Microsoft.Storage/storageAccounts/write"])
     )
     error_message = "Resource deployment must not grant wildcard actions or unconditional RBAC administration."
