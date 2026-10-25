@@ -71,3 +71,10 @@ jobs:
           aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
           config --severity HIGH,CRITICAL --exit-code 1
           --ignorefile infra/.trivyignore.yaml infra
+
+      - name: Scan Kubernetes configuration
+        run: >-
+          docker run --rm
+          --volume "$PWD:/repo:ro" --workdir /repo
+          aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+          config --severity HIGH,CRITICAL --exit-code 1 k8s

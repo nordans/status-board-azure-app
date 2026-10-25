@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: status-board-config
+data:
+  APP_ENV: development
+  APP_VERSION: dev
+  BOARD_TITLE: Platform Status
+  LOG_LEVEL: INFO
