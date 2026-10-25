@@ -154,8 +154,14 @@ With the container running, execute `uv run --locked python scripts/smoke_test.p
 
 ## Azure infrastructure
 
-Terraform configurations for the AKS development environment and its state backend are in [infra/README.md](infra/README.md). The `Infrastructure CI` workflow checks formatting, validates both configurations, runs mocked security tests, executes TFLint with AzureRM rules and scans for high and critical misconfigurations with Trivy. It runs without Azure credentials and does not provision resources.
+Terraform configurations for the AKS development environment, state backend and application delivery access are in [infra/README.md](infra/README.md). The `Infrastructure CI` workflow checks formatting, validates the roots and child modules, runs mocked security tests, executes TFLint with AzureRM rules and scans source and rendered Kubernetes configuration for high and critical misconfigurations with Trivy. It runs without Azure credentials and does not provision resources.
 
 Add `Infrastructure CI` alongside `CI` to the required status checks for `main`.
 
 The manual `Infrastructure deployment` workflow uses Azure OIDC, separate Plan/Apply identities and a required environment approval before executing a private saved plan. Select `deploy` for resource changes or `destroy` for development platform removal; both support plan-only runs. See the infrastructure README for bootstrap, repository configuration and lifecycle operations.
+
+## Application deployment
+
+The manual `Application deployment` workflow runs only from `main`. It reuses CI, builds and smoke-tests an image, reports image vulnerabilities, blocks fixable HIGH/CRITICAL findings and publishes the tested image to ACR. After environment approval, it deploys the exact digest to AKS and verifies rollout and the application Service.
+
+Publication, namespace deployment and temporary AKS API access use scoped OIDC identities. The application token is mounted from Azure Key Vault through CSI. See [delivery access](infra/delivery/README.md) for identity setup and [Kubernetes deployment](k8s/README.md#aks-prerequisites) for cluster prerequisites, workflow operation and recovery. No image is published or application deployed by the infrastructure workflow.
