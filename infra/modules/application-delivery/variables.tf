@@ -28,6 +28,11 @@ variable "registry_id" {
   type        = string
 }
 
+variable "node_subnet_id" {
+  description = "Existing AKS node subnet requiring linked-resource join authorization on cluster updates."
+  type        = string
+}
+
 variable "namespace" {
   description = "Existing application namespace managed by the cluster operator."
   type        = string

@@ -6,11 +6,13 @@ Creates three GitHub OIDC managed identities for an existing AKS platform. Confi
 | --- | --- | --- |
 | Publish | `dev-app-publish` | AcrPush and metadata Reader on one registry |
 | Deploy | `dev-app-deploy` | User credentials on one AKS; explicit application data actions on one namespace |
-| Network | `dev-app-deploy` | AKS read/write on one cluster |
+| Network | `dev-app-deploy` | AKS read/write on one cluster; subnet join on its existing node subnet |
 
 Inputs are declared in [variables.tf](variables.tf); [outputs.tf](outputs.tf) exports the three client IDs. Store these IDs as Actions secrets. No client passwords are created.
 
 The network role can change AKS configuration beyond its IP allowlist: Azure does not provide field-level RBAC for this update. It cannot delete the cluster, retrieve credentials or administer role assignments. Network and Deploy share a trusted environment and runner job, so separate identities provide scoped roles and audit attribution, not isolation from malicious deployment code.
+
+AKS updates also validate linked subnet authorization, including updates that only change API authorized IP ranges. A separate custom role grants the network identity only `Microsoft.Network/virtualNetworks/subnets/join/action` on `node_subnet_id`. It grants no subnet read, write or delete permission and does not use Network Contributor. The delivery root resolves the existing platform node subnet; it does not create or modify it.
 
 Deploy can modify application code and execute a smoke test in its pod. It must therefore be trusted with data available to that application, including its mounted token. It receives no direct Key Vault data role or Kubernetes Secret/RBAC administration. Namespace, ServiceAccount and SecretProviderClass are operator-managed prerequisites.
 

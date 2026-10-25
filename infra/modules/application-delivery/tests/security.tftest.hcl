@@ -2,6 +2,15 @@ mock_provider "azurerm" {
   override_during = plan
 }
 
+override_resource {
+  target          = azurerm_user_assigned_identity.github["network"]
+  override_during = plan
+  values = {
+    id           = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-tfstate/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-statusboard-app-network"
+    principal_id = "00000000-0000-0000-0000-000000000005"
+  }
+}
+
 variables {
   name_prefix                = "statusboard"
   resource_group_name        = "rg-statusboard-tfstate"
@@ -10,6 +19,7 @@ variables {
   workload_resource_group_id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev"
   cluster_id                 = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.ContainerService/managedClusters/aks-statusboard-dev"
   registry_id                = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.ContainerRegistry/registries/statusboarddev1234"
+  node_subnet_id             = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.Network/virtualNetworks/vnet-statusboard-dev/subnets/aks-nodes"
 }
 
 run "delivery_permissions" {
@@ -45,6 +55,18 @@ run "delivery_permissions" {
       ])
     )
     error_message = "The network identity may update one cluster, without deletion, credentials or role administration."
+  }
+
+  assert {
+    condition = (
+      azurerm_role_assignment.subnet_join.scope == var.node_subnet_id &&
+      azurerm_role_assignment.subnet_join.principal_id == azurerm_user_assigned_identity.github["network"].principal_id &&
+      toset(azurerm_role_definition.subnet_join.permissions[0].actions) == toset([
+        "Microsoft.Network/virtualNetworks/subnets/join/action"
+      ]) &&
+      length(coalesce(azurerm_role_definition.subnet_join.permissions[0].data_actions, [])) == 0
+    )
+    error_message = "Linked-resource authorization must grant only subnet join to the network identity on the node subnet."
   }
 
   assert {
