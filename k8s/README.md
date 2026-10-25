@@ -104,7 +104,7 @@ uv run --locked python scripts/render_aks.py bootstrap --app-client-id $workload
 kubectl --kubeconfig .cache/aks.kubeconfig --context status-board-azure apply --server-side --field-manager=status-board-bootstrap -f .cache/aks-bootstrap.yaml
 ```
 
-The CSI configuration mounts the secret as `/run/secrets/admin_api_token`, uses file permissions `0440` with the pod's filesystem group, and does not synchronize a Kubernetes Secret. Workload Identity adds its own projected Azure-audience token; automatic mounting of the default Kubernetes API token remains disabled. CSI rotation is enabled on the cluster and the application reads the token file when authorizing requests. Test rotation against the running AKS workload before relying on its timing.
+The CSI configuration mounts the secret as `/run/secrets/admin_api_token` with file permissions `0444` in a read-only volume mounted only in the application container. This permits UID 10001 to read the file without relying on CSI ownership changes; the managed AKS driver's `ReadWriteOnceWithFSType` policy does not guarantee filesystem-group handling for inline volumes. The token is not synchronized into a Kubernetes Secret. Workload Identity adds its own projected Azure-audience token; automatic mounting of the default Kubernetes API token remains disabled. CSI rotation is enabled on the cluster and the application reads the token file when authorizing requests. Test rotation against the running AKS workload before relying on its timing.
 
 ## Application deployment workflow
 
