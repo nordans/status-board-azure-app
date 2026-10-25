@@ -16,8 +16,4 @@ resource "azurerm_key_vault" "app" {
     ip_rules                   = var.operator_ipv4_addresses
     virtual_network_subnet_ids = var.subnet_ids
   }
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }

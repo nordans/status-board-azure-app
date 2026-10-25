@@ -121,10 +121,21 @@ The administrator group must exist and contain the authorized operators. Pipelin
 
 Once `infra-deploy.yml` is merged into `main`, run **Actions → Infrastructure deployment → Run workflow** on `main`:
 
-1. Leave `apply` disabled for a plan-only run. No platform apply job is started.
-2. Enable `apply` to create a plan, save it privately and request environment approval.
+1. Select `operation`: `deploy` creates a normal plan that may add, change, replace or remove resources; `destroy` creates a removal plan for all resources managed by the development root.
+2. Leave `apply` disabled to preview either plan. Enable it to save that plan privately and request environment approval.
 3. Review the plan in the job summary, including all deletions/replacements and the commit SHA. Approve `dev-infra-apply` only when it matches the intended change.
 4. The apply job checks out the same commit, downloads the saved plan, verifies SHA256 and applies that exact file. Terraform rejects a saved plan if the state has changed in the meantime; rerun planning rather than bypassing that check.
+
+| Operation | Apply | Behavior |
+| --- | --- | --- |
+| `deploy` | `false` | Preview normal resource changes |
+| `deploy` | `true` | Review and execute the saved normal plan |
+| `destroy` | `false` | Preview development platform removal |
+| `destroy` | `true` | Review and execute the saved removal plan |
+
+The removal path uses `terraform plan -destroy -out=...`, followed by `terraform apply <saved-plan>` after approval. Execution never generates a second plan. Both paths use the same state, OIDC identities, approval environment and concurrency lock. The operation is included in the run name, plan summary and private plan Blob name.
+
+Only `infra/environments/dev` is planned and applied. Platform removal includes AKS and its managed node resources, ACR and its images, networking, application identities and Key Vault. Resource groups, backend storage, state files, saved plans, deployment identities and bootstrap roles remain managed by the separate bootstrap root. Export any required images or data before approving removal.
 
 Plan files are stored in private Blob Storage, not public-repository Actions artifacts. They can contain sensitive values and should be removed when no longer required; Blob soft delete retains deleted versions for the configured retention period. Terraform log and summary rendering masks provider-declared sensitive attributes, but resource names, IDs, IP allowlists and other ordinary configuration appear in the plan.
 
@@ -173,4 +184,8 @@ The default configuration uses two Standard_D4s_v5 system nodes; override the SK
 
 AKS Free does not make worker VMs, disks, load balancers, public IPs or registry storage free. Upgrades may temporarily add a surge node. Confirm costs and quota before applying. Stop the cluster when idle with `az aks stop --resource-group <resource-group> --name <aks-name>`; disks and other retained resources continue to incur charges. Resume it with `az aks start` before further changes.
 
-State storage, its container and Key Vault use `prevent_destroy`. For permanent decommissioning, export required data, remove the applicable guards in a reviewed change, then inspect a destruction plan before applying. Key Vault purge protection prevents immediate purge for its seven-day retention period. Delete the platform before removing its bootstrap backend and resource group.
+State storage and its three containers retain `prevent_destroy`. The ephemeral development Key Vault permits deletion through a reviewed saved plan and retains seven-day soft-delete and purge protection. Provider setting `purge_soft_delete_on_destroy=false` prevents an automatic purge attempt. The deleted vault and its name remain reserved during retention.
+
+Redeploying the same vault name before retention expires requires recovery by an authorized operator. Recovery does not restore its former Azure RBAC assignments; reconcile the recovered resource with Terraform state and recreate the assignments before using it. Pipeline identities do not receive subscription-wide deleted-vault recovery or purge permissions. Otherwise wait for retention to expire before recreating that name.
+
+Permanent bootstrap decommissioning is a separate administrator operation: export required data, remove the relevant guards in a reviewed change and inspect its removal plan. Remove the development platform before its backend or resource groups.

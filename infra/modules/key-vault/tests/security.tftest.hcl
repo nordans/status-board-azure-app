@@ -18,6 +18,7 @@ run "secret_access_and_recovery" {
     condition = (
       azurerm_key_vault.app.rbac_authorization_enabled &&
       azurerm_key_vault.app.purge_protection_enabled &&
+      azurerm_key_vault.app.soft_delete_retention_days == 7 &&
       azurerm_key_vault.app.network_acls[0].default_action == "Deny" &&
       azurerm_key_vault.app.network_acls[0].bypass == "None"
     )

@@ -74,6 +74,7 @@ resource "azurerm_role_definition" "deploy" {
       "Microsoft.ContainerService/managedClusters/agentPools/write",
       "Microsoft.ContainerService/managedClusters/agentPools/delete",
       "Microsoft.ContainerRegistry/registries/read",
+      "Microsoft.ContainerRegistry/registries/operationStatuses/read",
       "Microsoft.ContainerRegistry/registries/write",
       "Microsoft.ContainerRegistry/registries/delete",
       "Microsoft.KeyVault/vaults/read",

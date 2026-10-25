@@ -158,4 +158,4 @@ Terraform configurations for the AKS development environment and its state backe
 
 Add `Infrastructure CI` alongside `CI` to the required status checks for `main`.
 
-The manual `Infrastructure deployment` workflow uses Azure OIDC, separate Plan/Apply identities and a required environment approval before applying a private saved plan. See the infrastructure README for bootstrap, repository variables and deployment operations.
+The manual `Infrastructure deployment` workflow uses Azure OIDC, separate Plan/Apply identities and a required environment approval before executing a private saved plan. Select `deploy` for resource changes or `destroy` for development platform removal; both support plan-only runs. See the infrastructure README for bootstrap, repository configuration and lifecycle operations.

@@ -1,8 +1,17 @@
 name: Infrastructure deployment
+run-name: Infrastructure ${{ inputs.operation || 'deploy' }} (${{ inputs.apply && 'execute' || 'plan only' }})
 
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: Plan resource changes or removal of the development platform
+        required: true
+        default: deploy
+        type: choice
+        options:
+          - deploy
+          - destroy
       apply:
         description: Apply the saved plan after environment approval
         required: true
@@ -36,10 +45,11 @@ env:
   PLAN_CONTAINER: ${{ vars.TF_PLAN_CONTAINER }}
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
+  TF_OPERATION: ${{ inputs.operation }}
 
 jobs:
   plan:
-    name: Plan development infrastructure
+    name: Plan development infrastructure (${{ inputs.operation }})
     if: github.ref == 'refs/heads/main'
     environment: dev-infra-plan
     runs-on: ubuntu-24.04
@@ -70,6 +80,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          case "$TF_OPERATION" in
+            deploy|destroy) ;;
+            *) printf 'Unsupported infrastructure operation\n' >&2; exit 1 ;;
+          esac
           for variable in ARM_CLIENT_ID ARM_TENANT_ID ARM_SUBSCRIPTION_ID TF_VAR_location TF_VAR_name_prefix TF_VAR_kubernetes_version TF_VAR_node_vm_size TF_VAR_operator_ipv4_addresses TF_VAR_aks_api_authorized_cidrs TF_VAR_aks_admin_group_object_ids STATE_ACCOUNT STATE_GROUP STATE_CONTAINER PLAN_CONTAINER; do
             if [ -z "${!variable}" ]; then
               printf 'Missing repository configuration for %s\n' "$variable" >&2
@@ -103,8 +117,12 @@ jobs:
       - name: Create and summarize plan
         id: plan
         run: |
+          plan_options=()
+          if [ "$TF_OPERATION" = "destroy" ]; then
+            plan_options+=(-destroy)
+          fi
           set +e
-          terraform -chdir=infra/environments/dev plan -lock-timeout=5m -detailed-exitcode -out="$RUNNER_TEMP/dev.tfplan"
+          terraform -chdir=infra/environments/dev plan "${plan_options[@]}" -lock-timeout=5m -detailed-exitcode -out="$RUNNER_TEMP/dev.tfplan"
           result=$?
           set -e
           if [ "$result" -ne 0 ] && [ "$result" -ne 2 ]; then
@@ -116,7 +134,7 @@ jobs:
             echo "changes=false" >> "$GITHUB_OUTPUT"
           fi
           {
-            printf '### Development infrastructure plan\n\nCommit: %s\n\n```terraform\n' "$GITHUB_SHA"
+            printf '### Development infrastructure plan\n\nOperation: %s\n\nCommit: %s\n\n```terraform\n' "$TF_OPERATION" "$GITHUB_SHA"
             terraform -chdir=infra/environments/dev show -no-color "$RUNNER_TEMP/dev.tfplan"
             printf '\n```\n'
           } >> "$GITHUB_STEP_SUMMARY"
@@ -125,7 +143,7 @@ jobs:
         id: save
         if: steps.plan.outputs.changes == 'true' && inputs.apply
         run: |
-          blob_name="$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT/dev.tfplan"
+          blob_name="$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT/$TF_OPERATION.tfplan"
           plan_sha=$(sha256sum "$RUNNER_TEMP/dev.tfplan" | cut -d ' ' -f 1)
           az storage blob upload --auth-mode login --account-name "$STATE_ACCOUNT" --container-name "$PLAN_CONTAINER" --name "$blob_name" --file "$RUNNER_TEMP/dev.tfplan" --overwrite false --only-show-errors -o none
           echo "plan_sha=$plan_sha" >> "$GITHUB_OUTPUT"
@@ -139,7 +157,7 @@ jobs:
           --state-file "$RUNNER_TEMP/backend-access.json"
 
   apply:
-    name: Apply reviewed development plan
+    name: Execute reviewed development plan (${{ inputs.operation }})
     needs: plan
     if: github.ref == 'refs/heads/main' && inputs.apply && needs.plan.outputs.changes == 'true'
     environment: dev-infra-apply
