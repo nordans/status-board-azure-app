@@ -194,7 +194,7 @@ jobs:
 
       - name: Test application through its Service
         run: |
-          kubectl --namespace status-board exec -i deployment/status-board -- python - --base-url http://status-board:8000 --token-file /run/secrets/admin_api_token < scripts/smoke_test.py
+          kubectl --namespace status-board exec -i deployment/status-board -- python - --base-url http://status-board:8000 --token-file /mnt/secrets-store/admin_api_token < scripts/smoke_test.py
           printf '### Application deployment verified\n\nCommit: %s\n\nImage: %s/status-board@%s\n\nRollout and Service smoke tests passed.\n' "$GITHUB_SHA" "$ACR_LOGIN_SERVER" "$IMAGE_DIGEST" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Show workload status on deployment failure

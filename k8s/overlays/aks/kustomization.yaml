@@ -48,6 +48,11 @@ patches:
             annotations:
               status-board/revision: __APP_VERSION__
           spec:
+            containers:
+              - name: status-board
+                env:
+                  - name: ADMIN_API_TOKEN_FILE
+                    value: /mnt/secrets-store/admin_api_token
             volumes:
               - name: admin-token
                 secret: null
@@ -56,3 +61,10 @@ patches:
                   readOnly: true
                   volumeAttributes:
                     secretProviderClass: status-board-key-vault
+  - target:
+      kind: Deployment
+      name: status-board
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/volumeMounts/0/mountPath
+        value: /mnt/secrets-store
