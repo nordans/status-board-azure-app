@@ -89,6 +89,21 @@ def open_access(
             )["exists"]
             if not exists:
                 raise RuntimeError("The development state container does not exist")
+            run_az(
+                "storage",
+                "blob",
+                "list",
+                "--auth-mode",
+                "login",
+                "--account-name",
+                account,
+                "--container-name",
+                container,
+                "--num-results",
+                "1",
+                "-o",
+                "none",
+            )
             return
         except subprocess.CalledProcessError:
             if time.monotonic() >= deadline:

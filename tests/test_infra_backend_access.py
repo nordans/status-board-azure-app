@@ -70,6 +70,51 @@ def test_cleanup_remains_possible_when_open_fails(tmp_path, monkeypatch):
     assert any("remove" in arguments for arguments in calls)
 
 
+def test_blob_listing_must_succeed_before_backend_is_ready(tmp_path, monkeypatch):
+    attempts = 0
+    waits = []
+
+    def az(*arguments):
+        nonlocal attempts
+        if "show" in arguments:
+            return account_config()
+        if "list" in arguments:
+            attempts += 1
+            if attempts == 1:
+                raise subprocess.CalledProcessError(1, "az", stderr="AuthorizationFailure")
+        return '{"exists": true}'
+
+    monkeypatch.setattr(backend, "run_az", az)
+    monkeypatch.setattr(backend.time, "sleep", waits.append)
+    state = tmp_path / "access.json"
+    backend.open_access(state, "rg-state", "stateaccount", "tfstate", "8.8.8.8")
+    assert attempts == 2
+    assert waits == [5]
+
+
+def test_blob_listing_timeout_preserves_cleanup_record(tmp_path, monkeypatch):
+    calls = []
+    clock_values = iter([0, 301])
+
+    def az(*arguments):
+        calls.append(arguments)
+        if "show" in arguments:
+            return account_config()
+        if "list" in arguments:
+            raise subprocess.CalledProcessError(1, "az", stderr="AuthorizationFailure")
+        return '{"exists": true}'
+
+    monkeypatch.setattr(backend, "run_az", az)
+    monkeypatch.setattr(backend.time, "monotonic", lambda: next(clock_values))
+    state = tmp_path / "access.json"
+    with pytest.raises(RuntimeError, match="within five minutes"):
+        backend.open_access(state, "rg-state", "stateaccount", "tfstate", "8.8.8.8")
+    assert state.exists()
+    backend.close_access(state, "rg-state", "stateaccount")
+    assert any("remove" in arguments for arguments in calls)
+    assert not state.exists()
+
+
 @pytest.mark.parametrize("address", ["127.0.0.1", "10.0.0.1", "::1", "not-an-address"])
 def test_nonpublic_addresses_are_rejected(address):
     with pytest.raises(ValueError):
