@@ -93,3 +93,21 @@ resource "azurerm_role_assignment" "network" {
   principal_id       = azurerm_user_assigned_identity.github["network"].principal_id
   principal_type     = "ServicePrincipal"
 }
+
+resource "azurerm_role_definition" "subnet_join" {
+  name              = "${var.name_prefix}-application-subnet-join"
+  scope             = var.workload_resource_group_id
+  assignable_scopes = [var.workload_resource_group_id]
+  description       = "Permit linked-resource authorization on the existing AKS node subnet during cluster updates."
+
+  permissions {
+    actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+  }
+}
+
+resource "azurerm_role_assignment" "subnet_join" {
+  scope              = var.node_subnet_id
+  role_definition_id = azurerm_role_definition.subnet_join.role_definition_resource_id
+  principal_id       = azurerm_user_assigned_identity.github["network"].principal_id
+  principal_type     = "ServicePrincipal"
+}
