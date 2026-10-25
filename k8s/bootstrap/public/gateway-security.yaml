@@ -1,0 +1,48 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: status-board-gateway-seccomp
+spec:
+  failurePolicy: Fail
+  reinvocationPolicy: IfNeeded
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: status-board-ingress
+    objectSelector:
+      matchLabels:
+        gateway.networking.k8s.io/gateway-name: status-board-public
+        gateway.networking.k8s.io/gateway-class-name: approuting-istio
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE]
+        resources: [pods]
+        scope: Namespaced
+  matchConditions:
+    - name: missing-pod-seccomp-profile
+      expression: "!has(object.spec.securityContext) || !has(object.spec.securityContext.seccompProfile)"
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: >-
+          Object{
+            spec: Object.spec{
+              securityContext: Object.spec.securityContext{
+                seccompProfile: Object.spec.securityContext.seccompProfile{
+                  type: "RuntimeDefault"
+                }
+              }
+            }
+          }
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: status-board-gateway-seccomp
+spec:
+  policyName: status-board-gateway-seccomp
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: status-board-ingress
