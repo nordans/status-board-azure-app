@@ -165,3 +165,5 @@ The manual `Infrastructure deployment` workflow uses Azure OIDC, separate Plan/A
 The manual `Application deployment` workflow runs only from `main`. It reuses CI, builds and smoke-tests an image, reports image vulnerabilities, blocks fixable HIGH/CRITICAL findings and publishes the tested image to ACR. After environment approval, it deploys the exact digest to AKS and verifies rollout and the application Service.
 
 Publication, namespace deployment and temporary AKS API access use scoped OIDC identities. The application token is mounted from Azure Key Vault through CSI. See [delivery access](infra/delivery/README.md) for identity setup and [Kubernetes deployment](k8s/README.md#aks-prerequisites) for cluster prerequisites, workflow operation and recovery. No image is published or application deployed by the infrastructure workflow.
+
+For a public Azure-provided hostname with automatically renewed HTTPS, follow [public HTTPS operations](k8s/PUBLIC-HTTPS.md). Public routing and certificate controllers are bootstrapped separately from application delivery. Once configured, deployments also verify the public endpoint and its served commit.

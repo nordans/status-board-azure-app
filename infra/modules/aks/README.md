@@ -6,4 +6,8 @@ Inputs: `name`, `name_prefix`, `tenant_id`, `subnet_id`, `registry_id`, `kuberne
 
 Outputs: `id`, `name`, `oidc_issuer_url`.
 
-The module inherits the AzureRM provider from its caller. See [infrastructure operations](../../README.md) for backend setup and validation.
+The module inherits AzureRM and AzAPI from its caller. AzAPI manages only `ingressProfile.gatewayAPI` and `ingressProfile.webAppRouting.gatewayAPIImplementations` on the existing cluster, enabling managed Gateway API CRDs and the `approuting-istio` implementation. AzureRM 5.11 does not expose these fields. No NGINX controller or application sidecar injection is enabled.
+
+The update does not create a public application listener. Operator-managed Gateway manifests are described in [public HTTPS operations](../../../k8s/PUBLIC-HTTPS.md). Removing the AzAPI update from Terraform state does not disable the cluster feature; remove Gateway resources before disabling the implementation. Destroying the development cluster removes the implementation with it.
+
+See [infrastructure operations](../../README.md) for backend setup and validation.

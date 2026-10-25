@@ -40,7 +40,11 @@ jobs:
         run: |
           mkdir -p "$TF_PLUGIN_CACHE_DIR"
           for module in infra/modules/*; do
-            cp infra/environments/dev/.terraform.lock.hcl "$module/.terraform.lock.hcl"
+            if [ "$module" = infra/modules/aks ]; then
+              cp infra/environments/dev/.terraform.lock.hcl "$module/.terraform.lock.hcl"
+            else
+              cp infra/bootstrap/.terraform.lock.hcl "$module/.terraform.lock.hcl"
+            fi
           done
           for root in infra/bootstrap infra/delivery infra/environments/dev infra/modules/*; do
             terraform -chdir="$root" init -backend=false -input=false -lockfile=readonly
@@ -89,6 +93,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/rendered-k8s"
           python3 scripts/render_aks.py bootstrap --app-client-id 00000000-0000-0000-0000-000000000001 --tenant-id 00000000-0000-0000-0000-000000000002 --key-vault-name kv-example --output "$RUNNER_TEMP/rendered-k8s/bootstrap.yaml"
           python3 scripts/render_aks.py application --image-repository example.azurecr.io/status-board --image-digest "sha256:$(printf '%064d' 0)" --app-version "$GITHUB_SHA" --output "$RUNNER_TEMP/rendered-k8s/application.yaml"
+          python3 scripts/render_aks.py public --public-dns-label statusboard-example --public-hostname statusboard-example.northeurope.cloudapp.azure.com --output "$RUNNER_TEMP/rendered-k8s/public-staging.yaml"
+          python3 scripts/render_aks.py public --public-dns-label statusboard-example --public-hostname statusboard-example.northeurope.cloudapp.azure.com --acme-environment production --output "$RUNNER_TEMP/rendered-k8s/public-production.yaml"
 
       - name: Scan rendered AKS configuration
         run: >-

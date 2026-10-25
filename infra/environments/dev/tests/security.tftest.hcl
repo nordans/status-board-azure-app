@@ -1,8 +1,11 @@
+mock_provider "azapi" {}
+
 mock_provider "azurerm" {
   override_during = plan
 
   mock_resource "azurerm_kubernetes_cluster" {
     defaults = {
+      id              = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.ContainerService/managedClusters/aks-statusboard-dev"
       oidc_issuer_url = "https://example.oic.prod-aks.azure.com/tenant/cluster/"
     }
   }

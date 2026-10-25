@@ -120,6 +120,7 @@ jobs:
       id-token: write
     env:
       IMAGE_DIGEST: ${{ needs.publish.outputs.digest }}
+      PUBLIC_HOSTNAME: ${{ vars.APP_PUBLIC_HOSTNAME }}
     steps:
       - name: Check out tested revision
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -196,6 +197,12 @@ jobs:
         run: |
           kubectl --namespace status-board exec -i deployment/status-board -- python - --base-url http://status-board:8000 --token-file /mnt/secrets-store/admin_api_token < scripts/smoke_test.py
           printf '### Application deployment verified\n\nCommit: %s\n\nImage: %s/status-board@%s\n\nRollout and Service smoke tests passed.\n' "$GITHUB_SHA" "$ACR_LOGIN_SERVER" "$IMAGE_DIGEST" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify public HTTPS endpoint
+        if: env.PUBLIC_HOSTNAME != ''
+        run: |
+          python3 -m scripts.verify_public_endpoint --hostname "$PUBLIC_HOSTNAME" --expected-version "$GITHUB_SHA"
+          printf '\nPublic HTTPS verified: https://%s\n' "$PUBLIC_HOSTNAME" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Show workload status on deployment failure
         if: failure() && steps.connection.outcome == 'success'

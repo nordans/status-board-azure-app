@@ -8,6 +8,16 @@ output "aks_name" {
   value       = module.aks.name
 }
 
+output "public_dns_label" {
+  description = "Regional Azure public IP DNS label for the operator-managed application Gateway."
+  value       = "${local.name}-${local.suffix}"
+}
+
+output "public_hostname" {
+  description = "Expected application hostname after the public Gateway is provisioned."
+  value       = "${local.name}-${local.suffix}.${var.location}.cloudapp.azure.com"
+}
+
 output "acr_login_server" {
   description = "Registry endpoint for application images."
   value       = module.registry.login_server

@@ -1,0 +1,14 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: status-board-public
+  namespace: status-board
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: status-board-ingress
+  to:
+    - group: ""
+      kind: Service
+      name: status-board

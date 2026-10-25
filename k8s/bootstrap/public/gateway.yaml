@@ -1,0 +1,29 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: status-board-public
+  namespace: status-board-ingress
+spec:
+  gatewayClassName: approuting-istio
+  infrastructure:
+    annotations:
+      service.beta.kubernetes.io/azure-dns-label-name: __PUBLIC_DNS_LABEL__
+  listeners:
+    - name: http
+      hostname: __PUBLIC_HOSTNAME__
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: https
+      hostname: __PUBLIC_HOSTNAME__
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: status-board-tls-__ACME_ENVIRONMENT__
+      allowedRoutes:
+        namespaces:
+          from: Same
