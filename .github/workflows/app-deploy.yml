@@ -1,0 +1,222 @@
+name: Application deployment
+run-name: Deploy application from main (${{ github.sha }})
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-dev
+  cancel-in-progress: false
+
+env:
+  ACR_NAME: ${{ vars.ACR_NAME }}
+  ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+  AKS_NAME: ${{ vars.AKS_NAME }}
+  AZURE_RESOURCE_GROUP: ${{ vars.APP_RESOURCE_GROUP }}
+
+jobs:
+  test:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Build, test, scan and publish image
+    if: github.ref == 'refs/heads/main'
+    needs: test
+    environment: dev-app-publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      APP_VERSION: ${{ github.sha }}
+      APP_ENV: ci
+    outputs:
+      digest: ${{ steps.publish.outputs.digest }}
+    steps:
+      - name: Check out deployment revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+
+      - name: Verify delivery configuration
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLISH_CLIENT_ID: ${{ secrets.AZURE_APP_PUBLISH_CLIENT_ID }}
+        run: |
+          for variable in ACR_NAME ACR_LOGIN_SERVER AKS_NAME AZURE_RESOURCE_GROUP PUBLISH_CLIENT_ID; do
+            test -n "${!variable}" || { printf 'Missing configuration: %s\n' "$variable" >&2; exit 1; }
+          done
+          test "$ACR_LOGIN_SERVER" = "$ACR_NAME.azurecr.io"
+          reviewers=$(gh api "repos/$GITHUB_REPOSITORY/environments/dev-app-deploy" --jq '[.protection_rules[] | select(.type == "required_reviewers") | .reviewers[]] | length')
+          test "$reviewers" -gt 0
+
+      - name: Build application image
+        run: >-
+          docker build --pull --target runtime
+          --label "org.opencontainers.image.revision=$GITHUB_SHA"
+          --tag "$ACR_LOGIN_SERVER/status-board:$GITHUB_SHA" .
+
+      - name: Test the built image
+        run: |
+          python3 scripts/new_local_secret.py
+          docker tag "$ACR_LOGIN_SERVER/status-board:$GITHUB_SHA" status-board:local
+          docker compose up --no-build --detach --wait --wait-timeout 90
+          python3 scripts/smoke_test.py
+          test "$(docker compose exec -T status-board id -u)" = "10001"
+
+      - name: Report image vulnerabilities
+        run: |
+          docker save --output "$RUNNER_TEMP/status-board.tar" "$ACR_LOGIN_SERVER/status-board:$GITHUB_SHA"
+          mkdir -p "$RUNNER_TEMP/trivy-cache"
+          docker run --rm --volume "$RUNNER_TEMP:/scan:ro" --volume "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c image --input /scan/status-board.tar --scanners vuln --severity HIGH,CRITICAL
+
+      - name: Block fixable high and critical vulnerabilities
+        run: >-
+          docker run --rm --volume "$RUNNER_TEMP:/scan:ro"
+          --volume "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy"
+          aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+          image --input /scan/status-board.tar --scanners vuln --severity HIGH,CRITICAL
+          --ignore-unfixed --skip-db-update --exit-code 1
+
+      - name: Sign in for image publication through OIDC
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906
+        with:
+          client-id: ${{ secrets.AZURE_APP_PUBLISH_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Publish tested image
+        id: publish
+        run: |
+          az acr login --name "$ACR_NAME" --only-show-errors
+          image="$ACR_LOGIN_SERVER/status-board:$GITHUB_SHA"
+          docker push "$image"
+          reference=$(docker image inspect "$image" --format '{{index .RepoDigests 0}}')
+          digest="${reference##*@}"
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          test "$reference" = "$ACR_LOGIN_SERVER/status-board@$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          printf '### Tested application image\n\nCommit: %s\n\nImage: %s\n' "$GITHUB_SHA" "$reference" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop test containers
+        if: always()
+        run: docker compose down
+
+  deploy:
+    name: Deploy and verify application
+    if: github.ref == 'refs/heads/main'
+    needs: publish
+    environment: dev-app-deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      IMAGE_DIGEST: ${{ needs.publish.outputs.digest }}
+    steps:
+      - name: Check out tested revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede
+        with:
+          version: v1.36.5
+
+      - name: Isolate delivery credentials
+        run: |
+          echo "KUBECONFIG=$RUNNER_TEMP/status-board.kubeconfig" >> "$GITHUB_ENV"
+          echo "AZURE_CONFIG_DIR=$RUNNER_TEMP/azure-delivery" >> "$GITHUB_ENV"
+
+      - name: Set up kubelogin
+        uses: azure/use-kubelogin@76597ae0fcbaace21b05e13a2cbf8daee2c6e820
+        with:
+          kubelogin-version: v0.2.22
+
+      - name: Sign in for temporary API access
+        id: network_login
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906
+        with:
+          client-id: ${{ secrets.AZURE_APP_NETWORK_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Allow this runner on the AKS API
+        run: >-
+          python3 -m scripts.aks_api_access open
+          --resource-group "$AZURE_RESOURCE_GROUP" --cluster "$AKS_NAME"
+          --record-file "$RUNNER_TEMP/aks-api-access.json"
+
+      - name: Clear network identity session
+        run: az account clear
+
+      - name: Sign in for application deployment
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906
+        with:
+          client-id: ${{ secrets.AZURE_APP_DEPLOY_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Connect to AKS using user credentials
+        id: connection
+        run: |
+          az aks get-credentials --resource-group "$AZURE_RESOURCE_GROUP" --name "$AKS_NAME" --file "$KUBECONFIG" --only-show-errors
+          kubelogin convert-kubeconfig --login azurecli
+          deadline=$((SECONDS + 300))
+          until kubectl --request-timeout=10s --namespace status-board auth can-i patch deployments --quiet; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              printf 'AKS API access or namespace authorization is unavailable\n' >&2
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Render and validate application manifests
+        run: |
+          python3 scripts/render_aks.py application --image-repository "$ACR_LOGIN_SERVER/status-board" --image-digest "$IMAGE_DIGEST" --app-version "$GITHUB_SHA" --output "$RUNNER_TEMP/application.yaml"
+          kubectl --namespace status-board apply --server-side --dry-run=server --field-manager=status-board-delivery -f "$RUNNER_TEMP/application.yaml"
+
+      - name: Deploy tested digest and wait for readiness
+        run: |
+          kubectl --namespace status-board apply --server-side --field-manager=status-board-delivery -f "$RUNNER_TEMP/application.yaml"
+          kubectl --namespace status-board rollout status deployment/status-board --timeout=300s
+          actual=$(kubectl --namespace status-board get deployment status-board -o jsonpath='{.spec.template.spec.containers[0].image}')
+          test "$actual" = "$ACR_LOGIN_SERVER/status-board@$IMAGE_DIGEST"
+
+      - name: Test application through its Service
+        run: |
+          kubectl --namespace status-board exec -i deployment/status-board -- python - --base-url http://status-board:8000 --token-file /mnt/secrets-store/admin_api_token < scripts/smoke_test.py
+          printf '### Application deployment verified\n\nCommit: %s\n\nImage: %s/status-board@%s\n\nRollout and Service smoke tests passed.\n' "$GITHUB_SHA" "$ACR_LOGIN_SERVER" "$IMAGE_DIGEST" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Show workload status on deployment failure
+        if: failure() && steps.connection.outcome == 'success'
+        run: kubectl --request-timeout=20s --namespace status-board get pods,events
+
+      - name: Clear deployment identity session
+        if: always() && steps.network_login.outcome == 'success'
+        run: az account clear
+
+      - name: Sign in for API access cleanup
+        id: cleanup_login
+        if: always() && steps.network_login.outcome == 'success'
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906
+        with:
+          client-id: ${{ secrets.AZURE_APP_NETWORK_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Remove only this runner's API rule
+        if: always() && steps.cleanup_login.outcome == 'success'
+        run: >-
+          python3 -m scripts.aks_api_access close
+          --resource-group "$AZURE_RESOURCE_GROUP" --cluster "$AKS_NAME"
+          --record-file "$RUNNER_TEMP/aks-api-access.json"

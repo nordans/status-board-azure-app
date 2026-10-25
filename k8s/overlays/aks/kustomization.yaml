@@ -1,0 +1,70 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - name: status-board
+    newName: __IMAGE_REPOSITORY__
+    digest: __IMAGE_DIGEST__
+patches:
+  - target:
+      kind: Namespace
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: status-board
+  - target:
+      kind: ServiceAccount
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: status-board
+  - target:
+      kind: ConfigMap
+    patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: status-board-config
+      data:
+        APP_ENV: azure-dev
+        APP_VERSION: __APP_VERSION__
+  - target:
+      kind: Deployment
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: status-board
+      spec:
+        template:
+          metadata:
+            labels:
+              azure.workload.identity/use: "true"
+            annotations:
+              status-board/revision: __APP_VERSION__
+          spec:
+            containers:
+              - name: status-board
+                env:
+                  - name: ADMIN_API_TOKEN_FILE
+                    value: /mnt/secrets-store/admin_api_token
+            volumes:
+              - name: admin-token
+                secret: null
+                csi:
+                  driver: secrets-store.csi.k8s.io
+                  readOnly: true
+                  volumeAttributes:
+                    secretProviderClass: status-board-key-vault
+  - target:
+      kind: Deployment
+      name: status-board
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/volumeMounts/0/mountPath
+        value: /mnt/secrets-store

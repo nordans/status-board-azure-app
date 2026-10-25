@@ -1,0 +1,6 @@
+subscription_id            = "00000000-0000-0000-0000-000000000000"
+name_prefix                = "statusboard"
+location                   = "northeurope"
+aks_name                   = "aks-statusboard-dev"
+acr_name                   = "<development registry name>"
+github_oidc_subject_prefix = "repo:owner@123/repository@456"

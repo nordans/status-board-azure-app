@@ -6,6 +6,7 @@ Terraform provisions an AKS development platform. GitHub Actions plans and deplo
 | --- | --- | --- |
 | `bootstrap` | Resource groups, private state/plan storage, deployment identities and scoped roles | Local initially; migrate to the isolated bootstrap container |
 | `environments/dev` | VNet, node subnet, AKS, ACR, Key Vault, managed identities, workload federation and role assignments | Azure Blob |
+| `delivery` | Main-only application publication, deployment and temporary API access identities | Separate key in the operator-only bootstrap container |
 
 ## Modules
 
@@ -20,6 +21,7 @@ Root configurations select environment settings, configure the provider and back
 | [workload-identity](modules/workload-identity/README.md) | Service account federation and read-only vault access | `client_id` |
 | [state-backend](modules/state-backend/README.md) | Protected state storage and Blob container | `storage_account_name`, `container_name`, `container_id` |
 | [github-oidc](modules/github-oidc/README.md) | Separate GitHub planning/deployment identities and constrained role delegation | `plan_client_id`, `apply_client_id` |
+| [application-delivery](modules/application-delivery/README.md) | Scoped application publication, namespace deployment and temporary API access | `client_ids` |
 
 `environments/dev/main.tf` wires the subnet and registry into AKS, then the AKS issuer and vault into workload identity. `bootstrap/main.tf` owns the resource groups and calls `state-backend` and `github-oidc`. Names, network ranges and node settings are selected by the roots. Module READMEs link to typed input declarations and list outputs.
 
@@ -159,14 +161,14 @@ The workflow sets `ARM_USE_OIDC=true`, `ARM_USE_AZUREAD=true`, `ARM_CLIENT_ID`, 
 
 ## Validation
 
-The `Infrastructure CI` workflow runs on every PR to `main`, push to `main` and manual dispatch. It has only `contents: read` permission and does not authenticate to Azure. Both roots and all seven child modules are independently initialized and validated. CI copies the development root lockfile into child module working directories before using `init -backend=false -lockfile=readonly`; the roots own committed provider selections. Provider changes require an intentional lockfile update. Lockfiles include Linux AMD64 and Windows AMD64 checksums.
+The `Infrastructure CI` workflow runs on every PR to `main`, push to `main` and manual dispatch. It has only `contents: read` permission and does not authenticate to Azure. All three roots and eight child modules are independently initialized and validated. CI copies the development root lockfile into child module working directories before using `init -backend=false -lockfile=readonly`; the roots own committed provider selections. Provider changes require an intentional lockfile update. Lockfiles include Linux AMD64 and Windows AMD64 checksums. CI also renders and scans both AKS manifest configurations with synthetic identity values.
 
 ```sh
 terraform fmt -check -recursive infra
 for module in infra/modules/*; do
   cp infra/environments/dev/.terraform.lock.hcl "$module/.terraform.lock.hcl"
 done
-for root in infra/bootstrap infra/environments/dev infra/modules/*; do
+for root in infra/bootstrap infra/delivery infra/environments/dev infra/modules/*; do
   terraform -chdir="$root" init -backend=false -lockfile=readonly
   terraform -chdir="$root" validate
   terraform -chdir="$root" test

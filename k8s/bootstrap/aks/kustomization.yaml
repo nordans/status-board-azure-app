@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: status-board
+resources:
+  - ../../base
+  - secretproviderclass.yaml
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: status-board
+  - target:
+      kind: Service
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: status-board
+  - target:
+      kind: ConfigMap
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: status-board-config
+  - target:
+      kind: ServiceAccount
+    patch: |-
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: status-board
+        annotations:
+          azure.workload.identity/client-id: __APP_CLIENT_ID__
+          azure.workload.identity/tenant-id: __TENANT_ID__
