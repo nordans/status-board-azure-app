@@ -25,6 +25,12 @@ variable "location" {
   default     = "westeurope"
 }
 
+variable "resource_group_location" {
+  description = "Resource group metadata region, kept stable when resource availability requires a different deployment region."
+  type        = string
+  default     = null
+}
+
 variable "operator_ipv4_addresses" {
   description = "Public IPv4 addresses allowed to access the state storage data plane."
   type        = set(string)
@@ -35,4 +41,19 @@ variable "operator_ipv4_addresses" {
     ])
     error_message = "Provide at least one IPv4 address without a CIDR suffix."
   }
+}
+
+variable "bootstrap_operator_object_id" {
+  description = "Microsoft Entra user object ID of the bootstrap operator, granted Blob data access."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.bootstrap_operator_object_id))
+    error_message = "Provide the bootstrap operator's Microsoft Entra user object UUID."
+  }
+}
+
+variable "github_oidc_subject_prefix" {
+  description = "Exact repository OIDC sub_claim_prefix returned by the GitHub API."
+  type        = string
 }

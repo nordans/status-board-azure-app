@@ -155,3 +155,5 @@ With the container running, execute `uv run --locked python scripts/smoke_test.p
 Terraform configurations for the AKS development environment and its state backend are in [infra/README.md](infra/README.md). The `Infrastructure CI` workflow checks formatting, validates both configurations, runs mocked security tests, executes TFLint with AzureRM rules and scans for high and critical misconfigurations with Trivy. It runs without Azure credentials and does not provision resources.
 
 Add `Infrastructure CI` alongside `CI` to the required status checks for `main`.
+
+The manual `Infrastructure deployment` workflow uses Azure OIDC, separate Plan/Apply identities and a required environment approval before applying a private saved plan. See the infrastructure README for bootstrap, repository variables and deployment operations.

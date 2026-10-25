@@ -14,9 +14,20 @@ run "state_access_and_recovery" {
     condition = (
       !azurerm_storage_account.state.shared_access_key_enabled &&
       !azurerm_storage_account.state.allow_nested_items_to_be_public &&
-      azurerm_storage_container.state.container_access_type == "private"
+      azurerm_storage_container.state.container_access_type == "private" &&
+      azurerm_storage_container.bootstrap.container_access_type == "private" &&
+      azurerm_storage_container.plans.container_access_type == "private"
     )
     error_message = "State must require Entra authentication and disallow public blob access."
+  }
+
+  assert {
+    condition = (
+      azurerm_storage_container.bootstrap.name != azurerm_storage_container.state.name &&
+      azurerm_storage_container.plans.name != azurerm_storage_container.state.name &&
+      azurerm_storage_container.bootstrap.name != azurerm_storage_container.plans.name
+    )
+    error_message = "Bootstrap state, platform state and saved plans must use separate private containers."
   }
 
   assert {
