@@ -162,7 +162,7 @@ The scoped Trivy exception in `.trivyignore.yaml` keeps trusted-service firewall
 
 ## Operations
 
-This environment uses two Standard_D4s_v5 system nodes, AKS Free control-plane tier, ACR Basic and locally redundant state storage. The system pool follows the [AKS minimum size requirements](https://learn.microsoft.com/en-us/azure/aks/use-system-pools). It has no multi-zone availability, application ingress, central log workspace or deployed workloads. Cilium enables network policy enforcement; workload policies belong with the application manifests. Application workloads will share this system pool in development; production workloads should use a separate user pool.
+The default configuration uses two Standard_D4s_v5 system nodes; override the SKU with `node_vm_size` or the workflow's `AKS_NODE_VM_SIZE` variable. It uses AKS Free control-plane tier, ACR Basic and locally redundant state storage. The system pool follows the [AKS minimum size requirements](https://learn.microsoft.com/en-us/azure/aks/use-system-pools). It has no multi-zone availability, application ingress, central log workspace or deployed workloads. Cilium enables network policy enforcement; workload policies belong with the application manifests. Application workloads will share this system pool in development; production workloads should use a separate user pool.
 
 AKS Free does not make worker VMs, disks, load balancers, public IPs or registry storage free. Upgrades may temporarily add a surge node. Confirm costs and quota before applying. Stop the cluster when idle with `az aks stop --resource-group <resource-group> --name <aks-name>`; disks and other retained resources continue to incur charges. Resume it with `az aks start` before further changes.
 
