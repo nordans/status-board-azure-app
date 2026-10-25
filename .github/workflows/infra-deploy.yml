@@ -199,9 +199,10 @@ jobs:
         env:
           BLOB_NAME: ${{ needs.plan.outputs.blob_name }}
           PLAN_SHA: ${{ needs.plan.outputs.plan_sha }}
-        run: |
-          az storage blob download --auth-mode login --account-name "$STATE_ACCOUNT" --container-name "$PLAN_CONTAINER" --name "$BLOB_NAME" --file "$RUNNER_TEMP/dev.tfplan" --only-show-errors -o none
-          printf '%s  %s\n' "$PLAN_SHA" "$RUNNER_TEMP/dev.tfplan" | sha256sum --check --strict
+        run: >-
+          python3 -m scripts.infra_plan_download
+          --account "$STATE_ACCOUNT" --container "$PLAN_CONTAINER" --name "$BLOB_NAME"
+          --destination "$RUNNER_TEMP/dev.tfplan" --sha256 "$PLAN_SHA"
 
       - name: Initialize development state
         run: >-
