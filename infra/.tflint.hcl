@@ -8,3 +8,8 @@ plugin "azurerm" {
   version = "0.32.0"
   source  = "github.com/terraform-linters/tflint-ruleset-azurerm"
 }
+
+rule "azurerm_resources_missing_prevent_destroy" {
+  enabled = true
+  exclude = ["azurerm_key_vault"]
+}

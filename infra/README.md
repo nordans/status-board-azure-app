@@ -178,6 +178,8 @@ The validation block above uses a POSIX shell. Terraform tests mock Azure: modul
 
 The scoped Trivy exception in `.trivyignore.yaml` keeps trusted-service firewall bypass disabled on state storage. It applies only to the storage rule in `modules/state-backend/main.tf`, carries a justification and expires on 2027-01-31. Other high and critical findings fail CI. Trivy downloads current checks when scanning.
 
+TFLint excludes `azurerm_key_vault` from its `prevent_destroy` requirement so the ephemeral development vault can be removed through a reviewed plan. The rule remains enabled for other resource types, including backend storage. Vault purge protection and seven-day retention remain checked by Terraform tests.
+
 ## Operations
 
 The default configuration uses two Standard_D4s_v5 system nodes; override the SKU with `node_vm_size` or the workflow's `AKS_NODE_VM_SIZE` variable. It uses AKS Free control-plane tier, ACR Basic and locally redundant state storage. The system pool follows the [AKS minimum size requirements](https://learn.microsoft.com/en-us/azure/aks/use-system-pools). It has no multi-zone availability, application ingress, central log workspace or deployed workloads. Cilium enables network policy enforcement; workload policies belong with the application manifests. Application workloads will share this system pool in development; production workloads should use a separate user pool.
