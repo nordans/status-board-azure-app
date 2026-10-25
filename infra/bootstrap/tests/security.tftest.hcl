@@ -3,8 +3,10 @@ mock_provider "azurerm" {
 }
 
 variables {
-  subscription_id         = "00000000-0000-0000-0000-000000000001"
-  operator_ipv4_addresses = ["203.0.113.10"]
+  subscription_id              = "00000000-0000-0000-0000-000000000001"
+  operator_ipv4_addresses      = ["203.0.113.10"]
+  bootstrap_operator_object_id = "00000000-0000-0000-0000-000000000004"
+  github_oidc_subject_prefix   = "repo:owner@123/repository@456"
 }
 
 run "backend_contract" {

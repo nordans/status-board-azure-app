@@ -1,0 +1,203 @@
+name: Infrastructure deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Apply the saved plan after environment approval
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-dev
+  cancel-in-progress: false
+
+env:
+  ARM_USE_OIDC: "true"
+  ARM_USE_AZUREAD: "true"
+  ARM_USE_CLI: "false"
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  TF_VAR_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  TF_VAR_location: ${{ vars.AZURE_LOCATION }}
+  TF_VAR_name_prefix: ${{ vars.TF_NAME_PREFIX }}
+  TF_VAR_kubernetes_version: ${{ vars.AKS_KUBERNETES_VERSION }}
+  TF_VAR_node_vm_size: ${{ vars.AKS_NODE_VM_SIZE }}
+  TF_VAR_operator_ipv4_addresses: ${{ vars.OPERATOR_IPV4_ADDRESSES }}
+  TF_VAR_aks_api_authorized_cidrs: ${{ vars.AKS_API_AUTHORIZED_CIDRS }}
+  TF_VAR_aks_admin_group_object_ids: ${{ vars.AKS_ADMIN_GROUP_OBJECT_IDS }}
+  STATE_ACCOUNT: ${{ vars.TF_STATE_STORAGE_ACCOUNT }}
+  STATE_GROUP: ${{ vars.TF_STATE_RESOURCE_GROUP }}
+  STATE_CONTAINER: ${{ vars.TF_STATE_CONTAINER }}
+  PLAN_CONTAINER: ${{ vars.TF_PLAN_CONTAINER }}
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  plan:
+    name: Plan development infrastructure
+    if: github.ref == 'refs/heads/main'
+    environment: dev-infra-plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+    env:
+      ARM_CLIENT_ID: ${{ vars.AZURE_PLAN_CLIENT_ID }}
+    outputs:
+      changes: ${{ steps.plan.outputs.changes }}
+      plan_sha: ${{ steps.save.outputs.plan_sha }}
+      blob_name: ${{ steps.save.outputs.blob_name }}
+    steps:
+      - name: Check out deployment revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e
+        with:
+          terraform_version: "1.17.0"
+          terraform_wrapper: false
+
+      - name: Verify deployment configuration
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for variable in ARM_CLIENT_ID ARM_TENANT_ID ARM_SUBSCRIPTION_ID TF_VAR_location TF_VAR_name_prefix TF_VAR_kubernetes_version TF_VAR_node_vm_size TF_VAR_operator_ipv4_addresses TF_VAR_aks_api_authorized_cidrs TF_VAR_aks_admin_group_object_ids STATE_ACCOUNT STATE_GROUP STATE_CONTAINER PLAN_CONTAINER; do
+            if [ -z "${!variable}" ]; then
+              printf 'Missing repository variable for %s\n' "$variable" >&2
+              exit 1
+            fi
+          done
+          reviewers=$(gh api "repos/$GITHUB_REPOSITORY/environments/dev-infra-apply" --jq '[.protection_rules[] | select(.type == "required_reviewers") | .reviewers[]] | length')
+          test "$reviewers" -gt 0
+
+      - name: Sign in to Azure through OIDC
+        id: login
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906
+        with:
+          client-id: ${{ vars.AZURE_PLAN_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Allow temporary backend access
+        run: >-
+          python3 scripts/infra_backend_access.py open
+          --resource-group "$STATE_GROUP" --account "$STATE_ACCOUNT"
+          --container "$STATE_CONTAINER" --state-file "$RUNNER_TEMP/backend-access.json"
+
+      - name: Initialize development state
+        run: >-
+          terraform -chdir=infra/environments/dev init -input=false -lockfile=readonly
+          -backend-config="storage_account_name=$STATE_ACCOUNT"
+          -backend-config="container_name=$STATE_CONTAINER"
+          -backend-config="key=dev.terraform.tfstate"
+
+      - name: Create and summarize plan
+        id: plan
+        run: |
+          set +e
+          terraform -chdir=infra/environments/dev plan -lock-timeout=5m -detailed-exitcode -out="$RUNNER_TEMP/dev.tfplan"
+          result=$?
+          set -e
+          if [ "$result" -ne 0 ] && [ "$result" -ne 2 ]; then
+            exit "$result"
+          fi
+          if [ "$result" -eq 2 ]; then
+            echo "changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changes=false" >> "$GITHUB_OUTPUT"
+          fi
+          {
+            printf '### Development infrastructure plan\n\nCommit: `%s`\n\n```terraform\n' "$GITHUB_SHA"
+            terraform -chdir=infra/environments/dev show -no-color "$RUNNER_TEMP/dev.tfplan"
+            printf '\n```\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save plan to private Blob Storage
+        id: save
+        if: steps.plan.outputs.changes == 'true' && inputs.apply
+        run: |
+          blob_name="$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT/dev.tfplan"
+          plan_sha=$(sha256sum "$RUNNER_TEMP/dev.tfplan" | cut -d ' ' -f 1)
+          az storage blob upload --auth-mode login --account-name "$STATE_ACCOUNT" --container-name "$PLAN_CONTAINER" --name "$blob_name" --file "$RUNNER_TEMP/dev.tfplan" --overwrite false --only-show-errors -o none
+          echo "plan_sha=$plan_sha" >> "$GITHUB_OUTPUT"
+          echo "blob_name=$blob_name" >> "$GITHUB_OUTPUT"
+
+      - name: Remove temporary backend access
+        if: always() && steps.login.outcome == 'success'
+        run: >-
+          python3 scripts/infra_backend_access.py close
+          --resource-group "$STATE_GROUP" --account "$STATE_ACCOUNT"
+          --state-file "$RUNNER_TEMP/backend-access.json"
+
+  apply:
+    name: Apply reviewed development plan
+    needs: plan
+    if: github.ref == 'refs/heads/main' && inputs.apply && needs.plan.outputs.changes == 'true'
+    environment: dev-infra-apply
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARM_CLIENT_ID: ${{ vars.AZURE_APPLY_CLIENT_ID }}
+    steps:
+      - name: Check out planned revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e
+        with:
+          terraform_version: "1.17.0"
+          terraform_wrapper: false
+
+      - name: Sign in to Azure through OIDC
+        id: login
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906
+        with:
+          client-id: ${{ vars.AZURE_APPLY_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Allow temporary backend access
+        run: >-
+          python3 scripts/infra_backend_access.py open
+          --resource-group "$STATE_GROUP" --account "$STATE_ACCOUNT"
+          --container "$STATE_CONTAINER" --state-file "$RUNNER_TEMP/backend-access.json"
+
+      - name: Download and verify reviewed plan
+        env:
+          BLOB_NAME: ${{ needs.plan.outputs.blob_name }}
+          PLAN_SHA: ${{ needs.plan.outputs.plan_sha }}
+        run: |
+          az storage blob download --auth-mode login --account-name "$STATE_ACCOUNT" --container-name "$PLAN_CONTAINER" --name "$BLOB_NAME" --file "$RUNNER_TEMP/dev.tfplan" --only-show-errors -o none
+          printf '%s  %s\n' "$PLAN_SHA" "$RUNNER_TEMP/dev.tfplan" | sha256sum --check --strict
+
+      - name: Initialize development state
+        run: >-
+          terraform -chdir=infra/environments/dev init -input=false -lockfile=readonly
+          -backend-config="storage_account_name=$STATE_ACCOUNT"
+          -backend-config="container_name=$STATE_CONTAINER"
+          -backend-config="key=dev.terraform.tfstate"
+
+      - name: Apply saved plan
+        run: terraform -chdir=infra/environments/dev apply -lock-timeout=5m "$RUNNER_TEMP/dev.tfplan"
+
+      - name: Remove temporary backend access
+        if: always() && steps.login.outcome == 'success'
+        run: >-
+          python3 scripts/infra_backend_access.py close
+          --resource-group "$STATE_GROUP" --account "$STATE_ACCOUNT"
+          --state-file "$RUNNER_TEMP/backend-access.json"

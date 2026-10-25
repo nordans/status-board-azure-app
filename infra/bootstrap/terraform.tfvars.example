@@ -1,3 +1,5 @@
 subscription_id         = "00000000-0000-0000-0000-000000000000"
 location                = "westeurope"
 operator_ipv4_addresses = ["203.0.113.10"]
+bootstrap_operator_object_id = "00000000-0000-0000-0000-000000000000"
+github_oidc_subject_prefix = "repo:owner@123/repository@456"

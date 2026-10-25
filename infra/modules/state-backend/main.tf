@@ -47,3 +47,23 @@ resource "azurerm_storage_container" "state" {
     prevent_destroy = true
   }
 }
+
+resource "azurerm_storage_container" "bootstrap" {
+  name                  = "bootstrap-state"
+  storage_account_id    = azurerm_storage_account.state.id
+  container_access_type = "private"
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "azurerm_storage_container" "plans" {
+  name                  = "tfplans"
+  storage_account_id    = azurerm_storage_account.state.id
+  container_access_type = "private"
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
