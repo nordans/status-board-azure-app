@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: status-board
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: status-board
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
