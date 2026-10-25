@@ -12,6 +12,11 @@ data "azurerm_subnet" "nodes" {
   resource_group_name  = data.azurerm_resource_group.platform.name
 }
 
+data "azurerm_user_assigned_identity" "control_plane" {
+  name                = "id-${var.name_prefix}-dev-aks"
+  resource_group_name = data.azurerm_resource_group.platform.name
+}
+
 module "application_delivery" {
   source                     = "../modules/application-delivery"
   name_prefix                = var.name_prefix
@@ -21,6 +26,7 @@ module "application_delivery" {
   cluster_id                 = "${data.azurerm_resource_group.platform.id}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
   registry_id                = "${data.azurerm_resource_group.platform.id}/providers/Microsoft.ContainerRegistry/registries/${var.acr_name}"
   node_subnet_id             = data.azurerm_subnet.nodes.id
+  control_plane_identity_id  = data.azurerm_user_assigned_identity.control_plane.id
   github_oidc_subject_prefix = var.github_oidc_subject_prefix
   tags = {
     application = "status-board"

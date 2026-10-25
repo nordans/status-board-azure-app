@@ -20,6 +20,7 @@ variables {
   cluster_id                 = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.ContainerService/managedClusters/aks-statusboard-dev"
   registry_id                = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.ContainerRegistry/registries/statusboarddev1234"
   node_subnet_id             = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.Network/virtualNetworks/vnet-statusboard-dev/subnets/aks-nodes"
+  control_plane_identity_id  = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-statusboard-dev-aks"
 }
 
 run "delivery_permissions" {
@@ -67,6 +68,18 @@ run "delivery_permissions" {
       length(coalesce(azurerm_role_definition.subnet_join.permissions[0].data_actions, [])) == 0
     )
     error_message = "Linked-resource authorization must grant only subnet join to the network identity on the node subnet."
+  }
+
+  assert {
+    condition = (
+      azurerm_role_assignment.identity_assign.scope == var.control_plane_identity_id &&
+      azurerm_role_assignment.identity_assign.principal_id == azurerm_user_assigned_identity.github["network"].principal_id &&
+      toset(azurerm_role_definition.identity_assign.permissions[0].actions) == toset([
+        "Microsoft.ManagedIdentity/userAssignedIdentities/assign/action"
+      ]) &&
+      length(coalesce(azurerm_role_definition.identity_assign.permissions[0].data_actions, [])) == 0
+    )
+    error_message = "Linked identity authorization must grant only assignment of the existing control plane identity to the network principal."
   }
 
   assert {
