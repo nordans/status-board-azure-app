@@ -33,6 +33,11 @@ variable "node_subnet_id" {
   type        = string
 }
 
+variable "control_plane_identity_id" {
+  description = "Existing user-assigned AKS control plane identity requiring linked assignment authorization on updates."
+  type        = string
+}
+
 variable "namespace" {
   description = "Existing application namespace managed by the cluster operator."
   type        = string

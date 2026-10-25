@@ -111,3 +111,21 @@ resource "azurerm_role_assignment" "subnet_join" {
   principal_id       = azurerm_user_assigned_identity.github["network"].principal_id
   principal_type     = "ServicePrincipal"
 }
+
+resource "azurerm_role_definition" "identity_assign" {
+  name              = "${var.name_prefix}-application-identity-assign"
+  scope             = var.workload_resource_group_id
+  assignable_scopes = [var.workload_resource_group_id]
+  description       = "Permit linked assignment authorization on the existing AKS control plane identity during cluster updates."
+
+  permissions {
+    actions = ["Microsoft.ManagedIdentity/userAssignedIdentities/assign/action"]
+  }
+}
+
+resource "azurerm_role_assignment" "identity_assign" {
+  scope              = var.control_plane_identity_id
+  role_definition_id = azurerm_role_definition.identity_assign.role_definition_resource_id
+  principal_id       = azurerm_user_assigned_identity.github["network"].principal_id
+  principal_type     = "ServicePrincipal"
+}

@@ -12,6 +12,12 @@ mock_provider "azurerm" {
       id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.Network/virtualNetworks/vnet-statusboard-dev/subnets/aks-nodes"
     }
   }
+
+  mock_data "azurerm_user_assigned_identity" {
+    defaults = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-statusboard-dev-aks"
+    }
+  }
 }
 
 variables {
