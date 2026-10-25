@@ -29,7 +29,7 @@ output "bootstrap_backend" {
 }
 
 output "github_variables" {
-  description = "Nonsecret repository variables required by the infrastructure deployment workflow."
+  description = "Repository configuration for the deployment workflow; store client IDs as Actions secrets."
   value = {
     AZURE_PLAN_CLIENT_ID     = module.github_oidc.plan_client_id
     AZURE_APPLY_CLIENT_ID    = module.github_oidc.apply_client_id

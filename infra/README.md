@@ -97,18 +97,25 @@ Review the saved plan before applying it. These commands create billable resourc
 
 Create environments `dev-infra-plan` and `dev-infra-apply`. For both, select custom deployment branch policies and allow only the `main` branch. Configure `dev-infra-apply` to require a trusted reviewer and disable administrator bypass. A single-owner repository may allow that owner to approve their own dispatch; multi-user repositories should prevent self-review.
 
-Set these repository Actions variables. IDs and configuration are variables, not client secrets:
+Set these repository Actions secrets. Identity IDs do not authenticate a caller on their own; secrets keep their values out of configuration listings and enable automatic masking in workflow logs. OIDC authentication does not require an Azure client secret.
 
-| Variable | Value |
+| Secret | Value |
 | --- | --- |
 | `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` | Active Azure tenant and subscription |
 | `AZURE_PLAN_CLIENT_ID`, `AZURE_APPLY_CLIENT_ID` | Client IDs from bootstrap `github_variables` |
+
+Use Actions variables for the remaining deployment configuration:
+
+| Variable | Value |
+| --- | --- |
 | `TF_STATE_RESOURCE_GROUP`, `TF_STATE_STORAGE_ACCOUNT`, `TF_STATE_CONTAINER`, `TF_PLAN_CONTAINER` | Values from bootstrap `github_variables` |
 | `AZURE_LOCATION`, `TF_NAME_PREFIX` | Deployment region and project prefix |
 | `AKS_KUBERNETES_VERSION`, `AKS_NODE_VM_SIZE` | Regionally supported version and VM SKU |
 | `OPERATOR_IPV4_ADDRESSES` | JSON array of allowed public operator IPv4 addresses |
 | `AKS_API_AUTHORIZED_CIDRS` | JSON array of allowed Kubernetes API IPv4 CIDRs |
 | `AKS_ADMIN_GROUP_OBJECT_IDS` | JSON array of Entra administrator security group object IDs |
+
+When migrating an existing repository, create the four secrets before merging the workflow update. After merging, delete the corresponding Actions variables and run a plan with `apply` disabled to verify the new configuration. Existing workflow logs are not retroactively masked; automatic masking is not a substitute for controlling what workflows print.
 
 The administrator group must exist and contain the authorized operators. Pipeline deployment identities receive no directory group administration rights. Confirm VM family quota and total regional quota, including the extra surge node required for upgrades, before approving a cluster plan.
 
