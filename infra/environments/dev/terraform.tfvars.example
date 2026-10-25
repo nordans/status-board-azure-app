@@ -1,0 +1,7 @@
+subscription_id            = "00000000-0000-0000-0000-000000000000"
+location                   = "westeurope"
+kubernetes_version         = "1.35"
+node_vm_size               = "Standard_D4s_v5"
+operator_ipv4_addresses    = ["203.0.113.10"]
+aks_api_authorized_cidrs    = ["203.0.113.10/32"]
+aks_admin_group_object_ids = ["00000000-0000-0000-0000-000000000000"]

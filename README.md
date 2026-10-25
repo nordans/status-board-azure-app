@@ -149,3 +149,9 @@ uv run --locked pip-audit --strict --disable-pip --require-hashes -r requirement
 `requirements-audit.txt` is a generated audit input excluded from Git. CI exports it to runner temporary storage. `uv.lock` is the project's dependency lockfile.
 
 With the container running, execute `uv run --locked python scripts/smoke_test.py` to verify the HTTP API. This submits a status report for the first configured service.
+
+## Azure infrastructure
+
+Terraform configurations for the AKS development environment and its state backend are in [infra/README.md](infra/README.md). The `Infrastructure CI` workflow checks formatting, validates both configurations, runs mocked security tests, executes TFLint with AzureRM rules and scans for high and critical misconfigurations with Trivy. It runs without Azure credentials and does not provision resources.
+
+Add `Infrastructure CI` alongside `CI` to the required status checks for `main`.
