@@ -6,6 +6,8 @@ Traffic follows `browser -> Azure Load Balancer -> HTTPS Gateway -> status-board
 
 The Gateway, Issuer, Certificate and HTTPRoutes live in `status-board-ingress`. A ReferenceGrant in `status-board` permits routes from that ingress namespace to reference only the application's named Service. Gateway listeners accept routes only from their own namespace. The application Service remains ClusterIP and its deployment identity gains no new permissions.
 
+The ingress namespace enforces restricted Pod Security Standards. The managed gateway template can omit a pod seccomp profile, which restricted admission rejects. A native Kubernetes 1.36 MutatingAdmissionPolicy supplies `RuntimeDefault` only when absent, only on creation of pods bearing this Gateway's name and class labels in `status-board-ingress`. It preserves explicit profiles and other security settings. Its binding is also restricted to that namespace; no external webhook or additional controller is installed. The two cluster-scoped policy resources are part of the operator bootstrap and are removed with it.
+
 ## Provision the cluster implementation
 
 Merge the infrastructure configuration and run **Infrastructure deployment** from `main` with operation `deploy`. Review the saved plan and approve its apply through `dev-infra-apply`. The new AzAPI resource patches only the two ingress settings on the existing AKS resource. It does not recreate the cluster or change its API allowlist.
@@ -93,3 +95,4 @@ Gateway deletion removes its generated Service and public frontend. Confirm that
 - [Azure public IP DNS labels](https://learn.microsoft.com/en-us/azure/aks/static-ip)
 - [cert-manager HTTP-01 Gateway solver](https://cert-manager.io/docs/configuration/acme/http01/)
 - [cert-manager supported releases](https://cert-manager.io/docs/releases/)
+- [Kubernetes mutating admission policies](https://kubernetes.io/docs/reference/access-authn-authz/mutating-admission-policy/)
