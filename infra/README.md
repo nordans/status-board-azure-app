@@ -34,6 +34,7 @@ The roots retain `moved` blocks for resources extracted into modules. Existing s
 - Terraform 1.17.x; CI uses 1.17.0.
 - Azure CLI and an active subscription.
 - AzureRM 5.11.x, resolved to 5.11.0 in each committed `.terraform.lock.hcl`.
+- AzAPI 2.13.x for managed Gateway API settings in the development root.
 - TFLint 0.65.0 and Docker for local static checks.
 - A Microsoft Entra security group for cluster administrators.
 
@@ -123,7 +124,7 @@ When migrating an existing repository, create the four secrets before merging th
 
 The administrator group must exist and contain the authorized operators. Pipeline deployment identities receive no directory group administration rights. Confirm VM family quota and total regional quota, including the extra surge node required for upgrades, before approving a cluster plan.
 
-Once `infra-deploy.yml` is merged into `main`, run **Actions → Infrastructure deployment → Run workflow** on `main`:
+Run **Actions → Infrastructure deployment → Run workflow** on `main`:
 
 1. Select `operation`: `deploy` creates a normal plan that may add, change, replace or remove resources; `destroy` creates a removal plan for all resources managed by the development root.
 2. Leave `apply` disabled to preview either plan. Enable it to save that plan privately and request environment approval.
@@ -155,7 +156,7 @@ AKS uses Entra authentication and Azure RBAC. Local cluster accounts are disable
 
 The cluster identity receives Network Contributor on its node subnet and Managed Identity Operator on the kubelet identity. The kubelet identity receives AcrPull on ACR. The application identity receives Key Vault Secrets User on its dedicated vault. It federates only with `system:serviceaccount:status-board:status-board` through the AKS OIDC issuer.
 
-The Key Vault firewall allows the node subnet through a service endpoint and the configured operator IPs. Purge protection is enabled. Secret values are created outside Terraform by a separately authorized operator; this configuration neither creates nor reads them. The application token must use 32–512 URL-safe characters. The later Kubernetes deployment must use the exported identity, namespace and service account, and mount the Key Vault secret through Secrets Store CSI with alias `admin_api_token`. Set `ADMIN_API_TOKEN_FILE` to the mounted path. CSI rotation polling is set to two minutes; avoid a `subPath` mount to allow refreshed files.
+The Key Vault firewall allows the node subnet through a service endpoint and the configured operator IPs. Purge protection is enabled. Secret values are created outside Terraform by a separately authorized operator; this configuration neither creates nor reads them. The application token must use 32–512 URL-safe characters. The AKS deployment uses the exported identity, namespace and service account, and mounts the Key Vault secret through Secrets Store CSI with alias `admin_api_token`. `ADMIN_API_TOKEN_FILE` points to the mounted path. CSI rotation polling is set to two minutes; the volume is mounted without `subPath` so refreshed files remain visible.
 
 ACR Basic uses its public authenticated endpoint with administrator credentials disabled. Key Vault and state storage also use public endpoints with firewall restrictions. This environment does not include private endpoints or a private AKS API. The infrastructure workflow uses controlled temporary backend firewall rules; OIDC authentication alone does not bypass a firewall.
 
@@ -163,12 +164,16 @@ The workflow sets `ARM_USE_OIDC=true`, `ARM_USE_AZUREAD=true`, `ARM_CLIENT_ID`, 
 
 ## Validation
 
-The `Infrastructure CI` workflow runs on every PR to `main`, push to `main` and manual dispatch. It has only `contents: read` permission and does not authenticate to Azure. All three roots and eight child modules are independently initialized and validated. CI copies the development root lockfile into child module working directories before using `init -backend=false -lockfile=readonly`; the roots own committed provider selections. Provider changes require an intentional lockfile update. Lockfiles include Linux AMD64 and Windows AMD64 checksums. CI also renders and scans both AKS manifest configurations with synthetic identity values.
+The `Infrastructure CI` workflow runs on every PR to `main`, push to `main` and manual dispatch. It has only `contents: read` permission and does not authenticate to Azure. All three roots and eight child modules are independently initialized and validated. The AKS module uses the development lockfile with AzureRM and AzAPI; the other modules use the bootstrap lockfile with AzureRM. Roots own the committed provider selections, including Linux AMD64 and Windows AMD64 checksums. CI also renders and scans AKS bootstrap, application and public HTTPS manifests with synthetic inputs.
 
 ```sh
 terraform fmt -check -recursive infra
 for module in infra/modules/*; do
-  cp infra/environments/dev/.terraform.lock.hcl "$module/.terraform.lock.hcl"
+  if [ "$module" = infra/modules/aks ]; then
+    cp infra/environments/dev/.terraform.lock.hcl "$module/.terraform.lock.hcl"
+  else
+    cp infra/bootstrap/.terraform.lock.hcl "$module/.terraform.lock.hcl"
+  fi
 done
 for root in infra/bootstrap infra/delivery infra/environments/dev infra/modules/*; do
   terraform -chdir="$root" init -backend=false -lockfile=readonly
@@ -188,7 +193,7 @@ TFLint excludes `azurerm_key_vault` from its `prevent_destroy` requirement so th
 
 ## Operations
 
-The default configuration uses two Standard_D4s_v5 system nodes; override the SKU with `node_vm_size` or the workflow's `AKS_NODE_VM_SIZE` variable. It uses AKS Free control-plane tier, ACR Basic and locally redundant state storage. The system pool follows the [AKS minimum size requirements](https://learn.microsoft.com/en-us/azure/aks/use-system-pools). It has no multi-zone availability, application ingress, central log workspace or deployed workloads. Cilium enables network policy enforcement; workload policies belong with the application manifests. Application workloads will share this system pool in development; production workloads should use a separate user pool.
+The default configuration uses two Standard_D4s_v5 system nodes; override the SKU with `node_vm_size` or the workflow's `AKS_NODE_VM_SIZE` variable. It uses AKS Free control-plane tier, ACR Basic and locally redundant state storage. The system pool follows the [AKS minimum size requirements](https://learn.microsoft.com/en-us/azure/aks/use-system-pools). Application workloads share this pool in development; production workloads should use a separate user pool. Cilium enables network policy enforcement. Application deployment and public Gateway configuration have separate bootstrap instructions. The platform has no multi-zone availability or central log workspace.
 
 AKS Free does not make worker VMs, disks, load balancers, public IPs or registry storage free. Upgrades may temporarily add a surge node. Confirm costs and quota before applying. Stop the cluster when idle with `az aks stop --resource-group <resource-group> --name <aks-name>`; disks and other retained resources continue to incur charges. Resume it with `az aks start` before further changes.
 
@@ -197,3 +202,25 @@ State storage and its three containers retain `prevent_destroy`. The ephemeral d
 Redeploying the same vault name before retention expires requires recovery by an authorized operator. Recovery does not restore its former Azure RBAC assignments; reconcile the recovered resource with Terraform state and recreate the assignments before using it. Pipeline identities do not receive subscription-wide deleted-vault recovery or purge permissions. Otherwise wait for retention to expire before recreating that name.
 
 Permanent bootstrap decommissioning is a separate administrator operation: export required data, remove the relevant guards in a reviewed change and inspect its removal plan. Remove the development platform before its backend or resource groups.
+
+## Development teardown
+
+Coordinate teardown with other operators and wait for application workflows to finish.
+
+1. Remove the [public HTTPS entry point](../k8s/PUBLIC-HTTPS.md#remove-public-exposure) and confirm its generated Azure public IP is gone.
+2. Review and apply a saved removal plan for [delivery access](delivery/README.md). Remove delivery roles before deleting their AKS, subnet, identity and ACR scopes.
+3. Run **Infrastructure deployment** from `main` with `operation=destroy` and `apply=true`. Review its deletion list before approving the saved plan. Bootstrap resources are outside this state.
+4. Verify Azure resources independently of Terraform. The workload resource group remains because bootstrap owns it; it should have no active resources. The AKS node resource group should be absent. Check the deleted-vault list separately because soft-delete retention is expected.
+5. Run a fresh destroy plan again. `apply=false` is sufficient to verify that the workflow reports no changes. Also verify delivery state and its fresh destroy plan:
+
+```sh
+az resource list --resource-group rg-<prefix>-dev --output table
+az group exists --name <aks-node-resource-group>
+terraform -chdir=infra/environments/dev state list
+terraform -chdir=infra/delivery state list
+terraform -chdir=infra/delivery plan -destroy -detailed-exitcode
+```
+
+An empty state and exit code `0` from the second destroy plan confirm that the operation has nothing left to remove. A normal plan after teardown proposes recreating the configured platform. Reapplying an old saved plan is a different operation: Terraform may reject it as stale after the state changes.
+
+Keep the backend, bootstrap state, infrastructure OIDC identities and resource groups available for verification and later provisioning. Stored application delivery client IDs no longer authenticate after their managed identities are deleted; recreate delivery access and update its Actions secrets before another application deployment.
