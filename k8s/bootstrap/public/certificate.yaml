@@ -1,0 +1,16 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: status-board-public
+  namespace: status-board-ingress
+spec:
+  secretName: status-board-tls-__ACME_ENVIRONMENT__
+  dnsNames:
+    - __PUBLIC_HOSTNAME__
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    name: letsencrypt-__ACME_ENVIRONMENT__
+    kind: Issuer

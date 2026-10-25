@@ -2,6 +2,8 @@
 
 Terraform provisions an AKS development platform. GitHub Actions plans and deploys infrastructure through OIDC. Application manifests and image publishing are managed separately.
 
+The AKS module enables managed Gateway API CRDs and the Application Routing Istio implementation through AzAPI. A separate operator bootstrap creates public application routing and certificates; follow [public HTTPS operations](../k8s/PUBLIC-HTTPS.md) after applying the reviewed development plan. The `public_dns_label` and `public_hostname` outputs provide its regional Azure DNS name. No purchased domain or Azure DNS zone is required.
+
 | Configuration | Resources | State |
 | --- | --- | --- |
 | `bootstrap` | Resource groups, private state/plan storage, deployment identities and scoped roles | Local initially; migrate to the isolated bootstrap container |

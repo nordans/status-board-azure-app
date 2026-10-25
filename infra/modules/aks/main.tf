@@ -5,6 +5,27 @@ resource "azurerm_user_assigned_identity" "cluster" {
   tags                = var.tags
 }
 
+resource "azapi_update_resource" "gateway_api" {
+  type        = "Microsoft.ContainerService/managedClusters@2026-03-01"
+  resource_id = azurerm_kubernetes_cluster.platform.id
+  body = {
+    properties = {
+      ingressProfile = {
+        gatewayAPI = {
+          installation = "Standard"
+        }
+        webAppRouting = {
+          gatewayAPIImplementations = {
+            appRoutingIstio = {
+              mode = "Enabled"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 resource "azurerm_role_assignment" "cluster_network" {
   scope                = var.subnet_id
   role_definition_name = "Network Contributor"

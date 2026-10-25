@@ -1,5 +1,13 @@
+mock_provider "azapi" {}
+
 mock_provider "azurerm" {
   override_during = plan
+
+  mock_resource "azurerm_kubernetes_cluster" {
+    defaults = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.ContainerService/managedClusters/aks-statusboard-dev"
+    }
+  }
 
   override_resource {
     target = azurerm_user_assigned_identity.cluster
@@ -41,6 +49,15 @@ variables {
 
 run "identity_and_network_boundaries" {
   command = plan
+
+  assert {
+    condition = (
+      azapi_update_resource.gateway_api.body.properties.ingressProfile.gatewayAPI.installation == "Standard" &&
+      azapi_update_resource.gateway_api.body.properties.ingressProfile.webAppRouting.gatewayAPIImplementations.appRoutingIstio.mode == "Enabled" &&
+      length(keys(azapi_update_resource.gateway_api.body.properties)) == 1
+    )
+    error_message = "The AzAPI update must enable managed Gateway API without overwriting other cluster properties."
+  }
 
   assert {
     condition = (

@@ -6,11 +6,19 @@ terraform {
   }
 
   required_providers {
+    azapi = {
+      source  = "Azure/azapi"
+      version = "~> 2.13.0"
+    }
     azurerm = {
       source  = "hashicorp/azurerm"
       version = "~> 5.11.0"
     }
   }
+}
+
+provider "azapi" {
+  subscription_id = var.subscription_id
 }
 
 provider "azurerm" {
