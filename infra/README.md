@@ -143,6 +143,8 @@ Each job exchanges its GitHub OIDC token for Azure access. `scripts/infra_backen
 
 Infrastructure deployments are serialized with cancellation disabled. Do not run a manual local apply concurrently with a workflow deployment. Azure Blob locking remains enabled, with a five-minute lock wait. The workflow never runs on pull requests and does not deploy application workloads or publish images.
 
+The apply job also retries the actual saved-plan download when Storage reports a network-related authorization denial, using a five-minute retry window. Successful state listing does not guarantee that a subsequent plan download will succeed. Explicit permission, authentication and missing-Blob errors fail immediately; persistent network denials fail with the last CLI error. Partial downloads are discarded, and the destination plan becomes available only after its SHA256 matches the planning job's digest. A hash mismatch stops execution. Temporary firewall access is cleaned up on failure as well as success. After merging a workflow fix, start a new run on `main`; rerunning an old run retains its original workflow revision.
+
 ## Access and secrets
 
 AKS uses Entra authentication and Azure RBAC. Local cluster accounts are disabled. Its public API is limited to `aks_api_authorized_cidrs`; an empty list and `0.0.0.0/0` are rejected. Use normal user credentials rather than `az aks get-credentials --admin`. Client access also requires the appropriate AKS credential retrieval permission and kubelogin.
