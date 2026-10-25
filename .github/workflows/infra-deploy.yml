@@ -116,7 +116,7 @@ jobs:
             echo "changes=false" >> "$GITHUB_OUTPUT"
           fi
           {
-            printf '### Development infrastructure plan\n\nCommit: `%s`\n\n```terraform\n' "$GITHUB_SHA"
+            printf '### Development infrastructure plan\n\nCommit: %s\n\n```terraform\n' "$GITHUB_SHA"
             terraform -chdir=infra/environments/dev show -no-color "$RUNNER_TEMP/dev.tfplan"
             printf '\n```\n'
           } >> "$GITHUB_STEP_SUMMARY"
