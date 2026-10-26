@@ -11,8 +11,11 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from starlette.responses import Response
 
 from app.config import Settings, load_services
+from app.metrics import Metrics, RequestMetricsMiddleware
 from app.security import TokenUnavailable, read_token, verify_token
 from app.store import BoardSnapshot, BoardStore, Service, StatusUpdate, utc_now
 
@@ -51,6 +54,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url=None,
         redoc_url=None,
     )
+    metrics = Metrics()
+    application.state.metrics = metrics
 
     @application.middleware("http")
     async def request_metadata(request: Request, call_next):
@@ -79,6 +84,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         )
         return response
+
+    application.add_middleware(RequestMetricsMiddleware, metrics=metrics)
+
+    @application.get("/metrics", include_in_schema=False)
+    def prometheus_metrics() -> Response:
+        try:
+            read_token(settings.token_file)
+            metrics.ready.set(1)
+        except TokenUnavailable:
+            metrics.ready.set(0)
+        return Response(
+            generate_latest(metrics.registry), headers={"Content-Type": CONTENT_TYPE_LATEST}
+        )
 
     def require_admin(
         credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],

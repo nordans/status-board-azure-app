@@ -99,3 +99,15 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "monitoring_enabled" {
+  description = "Enable managed Prometheus and Container Insights agents."
+  type        = bool
+  default     = false
+}
+
+variable "log_analytics_workspace_id" {
+  description = "Log Analytics workspace ID when monitoring is enabled."
+  type        = string
+  default     = null
+}

@@ -8,6 +8,15 @@ output "aks_name" {
   value       = module.aks.name
 }
 
+output "monitoring" {
+  description = "Workspace IDs and the managed Prometheus query endpoint, or null when disabled."
+  value = var.monitoring_enabled ? {
+    log_analytics_workspace_id = module.monitoring[0].log_analytics_workspace_id
+    monitor_workspace_id       = module.monitoring[0].monitor_workspace_id
+    prometheus_query_endpoint  = module.monitoring[0].prometheus_query_endpoint
+  } : null
+}
+
 output "public_dns_label" {
   description = "Regional Azure public IP DNS label for the operator-managed application Gateway."
   value       = "${local.name}-${local.suffix}"

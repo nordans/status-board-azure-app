@@ -71,6 +71,12 @@ jobs:
       - name: Run tests
         run: uv run --locked --no-sync pytest
 
+      - name: Validate monitoring configuration and alert behavior
+        run: |
+          docker run --rm --network none --entrypoint /bin/promtool --volume "$PWD/observability:/etc/prometheus:ro" prom/prometheus@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2 check config /etc/prometheus/prometheus.yaml
+          docker run --rm --network none --entrypoint /bin/promtool --volume "$PWD/observability:/etc/prometheus:ro" prom/prometheus@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2 test rules /etc/prometheus/rule-tests.json
+          docker run --rm --network none --entrypoint /bin/amtool --volume "$PWD/observability:/etc/observability:ro" prom/alertmanager@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a check-config /etc/observability/alertmanager.yaml
+
       - name: Audit dependencies
         run: |
           uv export --locked --all-groups --no-emit-project --no-header --no-annotate --quiet --output-file "$RUNNER_TEMP/requirements-audit.txt"

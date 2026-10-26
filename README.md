@@ -2,6 +2,8 @@
 
 For local Kubernetes deployment, see [Kubernetes operations](k8s/README.md).
 
+For local dashboards and Azure telemetry, see [Monitoring operations](observability/README.md).
+
 Service status dashboard with a public read API and authenticated status updates. Built with Python, FastAPI and vanilla JavaScript.
 
 ## Requirements

@@ -47,6 +47,22 @@ variables {
   dns_service_ip         = "10.43.0.10"
 }
 
+run "managed_monitoring_uses_entra" {
+  command = plan
+  variables {
+    monitoring_enabled         = true
+    log_analytics_workspace_id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.OperationalInsights/workspaces/law-statusboard-dev"
+  }
+  assert {
+    condition = (
+      length(azurerm_kubernetes_cluster.platform.monitor_metrics) == 1 &&
+      azurerm_kubernetes_cluster.platform.oms_agent[0].msi_auth_for_monitoring_enabled &&
+      azurerm_kubernetes_cluster.platform.oms_agent[0].log_analytics_workspace_id == var.log_analytics_workspace_id
+    )
+    error_message = "Managed monitoring must enable metrics and use managed identity for log ingestion."
+  }
+}
+
 run "identity_and_network_boundaries" {
   command = plan
 

@@ -117,6 +117,19 @@ resource "azurerm_kubernetes_cluster" "platform" {
     secret_rotation_interval = "2m"
   }
 
+  dynamic "monitor_metrics" {
+    for_each = var.monitoring_enabled ? [true] : []
+    content {}
+  }
+
+  dynamic "oms_agent" {
+    for_each = var.monitoring_enabled ? [true] : []
+    content {
+      log_analytics_workspace_id      = var.log_analytics_workspace_id
+      msi_auth_for_monitoring_enabled = true
+    }
+  }
+
   network_profile {
     network_plugin      = "azure"
     network_plugin_mode = "overlay"
