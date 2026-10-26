@@ -56,6 +56,8 @@ run "repository_and_environment_trust" {
       !contains(azurerm_role_definition.deploy.permissions[0].actions, "*") &&
       !contains(azurerm_role_definition.deploy.permissions[0].actions, "Microsoft.Authorization/roleAssignments/write") &&
       contains(azurerm_role_definition.deploy.permissions[0].actions, "Microsoft.OperationalInsights/workspaces/sharedKeys/action") &&
+      contains(azurerm_role_definition.deploy.permissions[0].actions, "Microsoft.OperationsManagement/solutions/write") &&
+      contains(azurerm_role_definition.deploy.permissions[0].actions, "Microsoft.OperationsManagement/solutions/delete") &&
       contains(azurerm_role_definition.deploy.permissions[0].actions, "Microsoft.Monitor/accounts/write") &&
       contains(azurerm_role_definition.deploy.permissions[0].actions, "Microsoft.AlertsManagement/prometheusRuleGroups/delete") &&
       contains(azurerm_role_definition.deploy.permissions[0].actions, "Microsoft.ContainerRegistry/registries/operationStatuses/read") &&

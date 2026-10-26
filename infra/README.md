@@ -24,6 +24,7 @@ Root configurations select environment settings, configure the provider and back
 | [state-backend](modules/state-backend/README.md) | Protected state storage and Blob container | `storage_account_name`, `container_name`, `container_id` |
 | [github-oidc](modules/github-oidc/README.md) | Separate GitHub planning/deployment identities and constrained role delegation | `plan_client_id`, `apply_client_id` |
 | [application-delivery](modules/application-delivery/README.md) | Scoped application publication, namespace deployment and temporary API access | `client_ids` |
+| [monitoring](modules/monitoring/README.md) | Managed metrics, log workspace, ContainerInsights solution, collection and alerts | workspace IDs and query endpoint |
 
 `environments/dev/main.tf` wires the subnet and registry into AKS, then the AKS issuer and vault into workload identity. `bootstrap/main.tf` owns the resource groups and calls `state-backend` and `github-oidc`. Names, network ranges and node settings are selected by the roots. Module READMEs link to typed input declarations and list outputs.
 
@@ -40,7 +41,7 @@ The roots retain `moved` blocks for resources extracted into modules. Existing s
 
 Bootstrap requires permission to create resource groups, storage, managed identities, custom role definitions and role assignments, typically an authorized subscription Owner. The deployment workflow uses the custom platform role and conditional delegation created by bootstrap rather than subscription-wide administrative roles. Azure management roles alone do not grant Blob or Key Vault data access.
 
-Register these resource providers once using an authorized subscription administrator: `Microsoft.Storage`, `Microsoft.Compute`, `Microsoft.Network`, `Microsoft.ContainerService`, `Microsoft.ContainerRegistry`, `Microsoft.KeyVault` and `Microsoft.ManagedIdentity`. Provider auto-registration is disabled.
+Register these resource providers once using an authorized subscription administrator: `Microsoft.Storage`, `Microsoft.Compute`, `Microsoft.Network`, `Microsoft.ContainerService`, `Microsoft.ContainerRegistry`, `Microsoft.KeyVault`, `Microsoft.ManagedIdentity`, `Microsoft.Monitor`, `Microsoft.OperationalInsights`, `Microsoft.Insights`, `Microsoft.AlertsManagement` and `Microsoft.OperationsManagement`. Provider auto-registration is disabled.
 
 ## Bootstrap
 
@@ -124,7 +125,7 @@ When migrating an existing repository, create the four secrets before merging th
 
 The administrator group must exist and contain the authorized operators. Pipeline deployment identities receive no directory group administration rights. Confirm VM family quota and total regional quota, including the extra surge node required for upgrades, before approving a cluster plan.
 
-Run **Actions → Infrastructure deployment → Run workflow** on `main`:
+Run **Actions â†’ Infrastructure deployment â†’ Run workflow** on `main`:
 
 1. Select `operation`: `deploy` creates a normal plan that may add, change, replace or remove resources; `destroy` creates a removal plan for all resources managed by the development root.
 2. Leave `apply` disabled to preview either plan. Enable it to save that plan privately and request environment approval.
@@ -156,7 +157,7 @@ AKS uses Entra authentication and Azure RBAC. Local cluster accounts are disable
 
 The cluster identity receives Network Contributor on its node subnet and Managed Identity Operator on the kubelet identity. The kubelet identity receives AcrPull on ACR. The application identity receives Key Vault Secrets User on its dedicated vault. It federates only with `system:serviceaccount:status-board:status-board` through the AKS OIDC issuer.
 
-The Key Vault firewall allows the node subnet through a service endpoint and the configured operator IPs. Purge protection is enabled. Secret values are created outside Terraform by a separately authorized operator; this configuration neither creates nor reads them. The application token must use 32–512 URL-safe characters. The AKS deployment uses the exported identity, namespace and service account, and mounts the Key Vault secret through Secrets Store CSI with alias `admin_api_token`. `ADMIN_API_TOKEN_FILE` points to the mounted path. CSI rotation polling is set to two minutes; the volume is mounted without `subPath` so refreshed files remain visible.
+The Key Vault firewall allows the node subnet through a service endpoint and the configured operator IPs. Purge protection is enabled. Secret values are created outside Terraform by a separately authorized operator; this configuration neither creates nor reads them. The application token must use 32â€“512 URL-safe characters. The AKS deployment uses the exported identity, namespace and service account, and mounts the Key Vault secret through Secrets Store CSI with alias `admin_api_token`. `ADMIN_API_TOKEN_FILE` points to the mounted path. CSI rotation polling is set to two minutes; the volume is mounted without `subPath` so refreshed files remain visible.
 
 ACR Basic uses its public authenticated endpoint with administrator credentials disabled. Key Vault and state storage also use public endpoints with firewall restrictions. This environment does not include private endpoints or a private AKS API. The infrastructure workflow uses controlled temporary backend firewall rules; OIDC authentication alone does not bypass a firewall.
 
