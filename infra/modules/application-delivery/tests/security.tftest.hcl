@@ -115,11 +115,11 @@ run "monitoring_link_is_workspace_scoped" {
       azurerm_role_assignment.monitoring_link[0].scope == var.log_analytics_workspace_id &&
       azurerm_role_assignment.monitoring_link[0].principal_id == azurerm_user_assigned_identity.github["network"].principal_id &&
       toset(azurerm_role_definition.monitoring_link[0].permissions[0].actions) == toset([
-        "Microsoft.OperationalInsights/workspaces/sharedKeys/action", "Microsoft.OperationsManagement/solutions/write"
+        "Microsoft.OperationalInsights/workspaces/read", "Microsoft.OperationalInsights/workspaces/sharedKeys/action", "Microsoft.OperationsManagement/solutions/write"
       ]) &&
       length(coalesce(azurerm_role_definition.monitoring_link[0].permissions[0].data_actions, [])) == 0
     )
-    error_message = "Only the network identity may receive the two linked-workspace actions on the exact workspace."
+    error_message = "Only the network identity may receive the three linked-workspace actions on the exact workspace."
   }
 }
 
