@@ -110,12 +110,12 @@ run "monitor_operation_results_access" {
     condition = (
       azurerm_role_definition.monitor_operations.scope == "/subscriptions/00000000-0000-0000-0000-000000000001" &&
       toset(azurerm_role_definition.monitor_operations.assignable_scopes) == toset(["/subscriptions/00000000-0000-0000-0000-000000000001"]) &&
-      toset(azurerm_role_definition.monitor_operations.permissions[0].actions) == toset(["Microsoft.Monitor/locations/operationResults/read"]) &&
+      toset(azurerm_role_definition.monitor_operations.permissions[0].actions) == toset(["Microsoft.Monitor/locations/*/read"]) &&
       length(coalesce(azurerm_role_definition.monitor_operations.permissions[0].data_actions, [])) == 0 &&
       azurerm_role_assignment.monitor_operations.scope == azurerm_role_definition.monitor_operations.scope &&
       azurerm_role_assignment.monitor_operations.principal_id == azurerm_user_assigned_identity.github["apply"].principal_id &&
       azurerm_role_assignment.monitor_operations.principal_type == "ServicePrincipal"
     )
-    error_message = "Only Apply may receive the single subscription-scoped Azure Monitor operation-result read action without data access."
+    error_message = "Only Apply may receive the subscription-scoped Azure Monitor regional read pattern without data access."
   }
 }
