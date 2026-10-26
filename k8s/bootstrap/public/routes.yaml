@@ -46,6 +46,9 @@ spec:
         - path:
             type: PathPrefix
             value: /static
+        - path:
+            type: Exact
+            value: /openapi.json
       filters:
         - type: ResponseHeaderModifier
           responseHeaderModifier:

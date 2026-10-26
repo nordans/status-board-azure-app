@@ -83,6 +83,13 @@ jobs:
           aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
           config --severity HIGH,CRITICAL --exit-code 1 k8s
 
+      - name: Scan monitoring configuration
+        run: >-
+          docker run --rm
+          --volume "$PWD:/repo:ro" --workdir /repo
+          aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+          config --severity HIGH,CRITICAL --exit-code 1 observability
+
       - name: Set up kubectl for manifest rendering
         uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede
         with:

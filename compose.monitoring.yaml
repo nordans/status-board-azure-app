@@ -38,7 +38,9 @@ services:
     pids_limit: 100
 
   grafana:
-    image: grafana/grafana@sha256:3838fe4d1cb7fef51a91b9a72011a7a68736b6052785594d437ec65d441acd8b
+    build:
+      context: ./observability/grafana
+    image: status-board-grafana:local
     ports:
       - "127.0.0.1:3000:3000"
     environment:

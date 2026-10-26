@@ -41,12 +41,14 @@ Add `--volumes` only when local monitoring history is no longer needed.
 
 ### Image vulnerability status
 
-Images are pinned to immutable official artifacts: Prometheus 3.x, Alertmanager 0.34.1 and Grafana 13.2.4 distroless-slim. Grafana omits bundled optional plugins. The 2026-10-26 Trivy scan with the application policy (`HIGH,CRITICAL`, fixed-version findings) reported no findings for Prometheus, six HIGH findings for Grafana and twelve HIGH occurrences across five CVEs for Alertmanager. No CRITICAL findings were reported. These local artifacts do not pass a zero-HIGH vulnerability gate. No scan exclusions were added. Check for patched stable artifacts before broader use; neither Grafana nor Alertmanager is deployed to Azure by this module.
+Prometheus 3.x and Alertmanager 0.34.1 use immutable official image digests. The local Grafana image uses the pinned 13.2.4 distroless-slim base and copies only its Prometheus datasource from the pinned full release. The 2026-10-26 Trivy scan with the application policy (`HIGH,CRITICAL`, fixed-version findings) reported no findings for Prometheus, eleven HIGH occurrences across nine CVEs for the built Grafana image and twelve HIGH occurrences across five CVEs for Alertmanager. No CRITICAL findings were reported. These local artifacts do not pass a zero-HIGH vulnerability gate. No scan exclusions were added. Check for patched stable artifacts before broader use; neither Grafana nor Alertmanager is deployed to Azure by this module.
 
 Recheck a pinned image with the repository's Trivy version:
 
-```sh
-docker run --rm aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 grafana/grafana@sha256:3838fe4d1cb7fef51a91b9a72011a7a68736b6052785594d437ec65d441acd8b
+```powershell
+New-Item -ItemType Directory -Force .cache | Out-Null
+docker image save --output .cache/grafana-scan.tar status-board-grafana:local
+docker run --rm --volume "${PWD}/.cache:/scan:ro" aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c image --input /scan/grafana-scan.tar --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
 ```
 
 ## Metrics and alerts
@@ -91,7 +93,7 @@ Before deployment:
 kubectl --kubeconfig <operator-kubeconfig> --context status-board-azure apply -k k8s/bootstrap/monitoring
 ```
 
-The managed metrics replica scrapes the internal application Service every 30 seconds; unrestricted annotation scraping is not enabled. Public HTTPS permits application/API/health/static paths, with no route for `/metrics`. The public deployment probe requires 404 for `/metrics` and `/metrics/`.
+The managed metrics replica scrapes the internal application Service every 30 seconds; unrestricted annotation scraping is not enabled. Public HTTPS permits application/API/health/static paths and `/openapi.json`, with no route for `/metrics`. The public deployment probe requires 404 for `/metrics` and `/metrics/`.
 
 The `kube-system` ConfigMaps are operator-owned. Application deployment credentials retain their namespace boundary. Deploy the application with the existing workflow, then check collection. Allow up to 15 minutes for initial ingestion. Using an operator account with workspace query rights, run this PowerShell example:
 
