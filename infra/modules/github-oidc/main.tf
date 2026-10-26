@@ -138,7 +138,7 @@ resource "azurerm_role_definition" "monitor_operations" {
   description       = "Read Azure Monitor asynchronous operation results for platform deployment."
 
   permissions {
-    actions = ["Microsoft.Monitor/locations/operationResults/read"]
+    actions = ["Microsoft.Monitor/locations/*/read"]
   }
 }
 
