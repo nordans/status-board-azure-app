@@ -84,3 +84,38 @@ run "reject_unscoped_subject" {
 
   expect_failures = [var.github_oidc_subject_prefix]
 }
+
+run "monitor_operation_results_access" {
+  command = plan
+
+  override_resource {
+    target          = azurerm_user_assigned_identity.github["apply"]
+    override_during = plan
+    values = {
+      id           = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-tfstate/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-statusboard-infra-apply"
+      principal_id = "00000000-0000-0000-0000-000000000006"
+    }
+  }
+
+  override_resource {
+    target          = azurerm_user_assigned_identity.github["plan"]
+    override_during = plan
+    values = {
+      id           = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-tfstate/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-statusboard-infra-plan"
+      principal_id = "00000000-0000-0000-0000-000000000007"
+    }
+  }
+
+  assert {
+    condition = (
+      azurerm_role_definition.monitor_operations.scope == "/subscriptions/00000000-0000-0000-0000-000000000001" &&
+      toset(azurerm_role_definition.monitor_operations.assignable_scopes) == toset(["/subscriptions/00000000-0000-0000-0000-000000000001"]) &&
+      toset(azurerm_role_definition.monitor_operations.permissions[0].actions) == toset(["Microsoft.Monitor/locations/operationResults/read"]) &&
+      length(coalesce(azurerm_role_definition.monitor_operations.permissions[0].data_actions, [])) == 0 &&
+      azurerm_role_assignment.monitor_operations.scope == azurerm_role_definition.monitor_operations.scope &&
+      azurerm_role_assignment.monitor_operations.principal_id == azurerm_user_assigned_identity.github["apply"].principal_id &&
+      azurerm_role_assignment.monitor_operations.principal_type == "ServicePrincipal"
+    )
+    error_message = "Only Apply may receive the single subscription-scoped Azure Monitor operation-result read action without data access."
+  }
+}

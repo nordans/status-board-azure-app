@@ -163,6 +163,8 @@ ACR Basic uses its public authenticated endpoint with administrator credentials 
 
 The workflow sets `ARM_USE_OIDC=true`, `ARM_USE_AZUREAD=true`, `ARM_CLIENT_ID`, `ARM_TENANT_ID` and `ARM_SUBSCRIPTION_ID`, and grants only deployment jobs `id-token: write`. The Apply identity's role-assignment condition permits only four application roles for service principals in the development resource group. The Plan identity has no platform write or RBAC-delegation role, but it does have state/plan Blob write and backend network write. Neither identity is a subscription Owner or an unrestricted RBAC Administrator. Neither receives bootstrap state data access or Key Vault secret data access directly.
 
+Apply also has a separate subscription-scoped role with only `Microsoft.Monitor/locations/operationResults/read`. Azure Monitor workspace deletion polls an asynchronous result outside the workload resource group. The role exposes operation-result metadata across the subscription, without workspace write, metrics/log data or RBAC administration. The operator must apply its bootstrap plan before platform teardown.
+
 ## Validation
 
 The `Infrastructure CI` workflow runs on every PR to `main`, push to `main` and manual dispatch. It has only `contents: read` permission and does not authenticate to Azure. All three roots and eight child modules are independently initialized and validated. The AKS module uses the development lockfile with AzureRM and AzAPI; the other modules use the bootstrap lockfile with AzureRM. Roots own the committed provider selections, including Linux AMD64 and Windows AMD64 checksums. CI also renders and scans AKS bootstrap, application and public HTTPS manifests with synthetic inputs.
