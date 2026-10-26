@@ -19,3 +19,6 @@ The same update requires `Microsoft.ManagedIdentity/userAssignedIdentities/assig
 Deploy can modify application code and execute a smoke test in its pod. It must therefore be trusted with data available to that application, including its mounted token. It receives no direct Key Vault data role or Kubernetes Secret/RBAC administration. Namespace, ServiceAccount and SecretProviderClass are operator-managed prerequisites.
 
 The registry must use RBAC Registry Permissions mode. AcrPush does not apply to ABAC-enabled registries. Migrate registry mode and all publisher/kubelet roles together if adopting ABAC later.
+
+
+Monitored AKS writes require Log Analytics linked authorization even when managed identity ingestion and disabled local authentication are configured. Terraform Apply has `Microsoft.OperationalInsights/workspaces/sharedKeys/action` in the workload group. The operator-managed delivery root separately grants the API network identity only this action on the exact Log Analytics workspace when monitoring is enabled. Publisher and application deployment identities receive no workspace grant. This action permits retrieving workspace keys; Terraform does not retrieve or export them, and the workspace rejects key-based authentication. Set `monitoring_enabled = false` in the delivery root when platform monitoring is disabled.

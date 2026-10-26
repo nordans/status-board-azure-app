@@ -44,6 +44,20 @@ variable "namespace" {
   default     = "status-board"
 }
 
+variable "log_analytics_workspace_id" {
+  description = "Optional workload Log Analytics workspace requiring linked authorization for AKS updates."
+  type        = string
+  default     = null
+
+  validation {
+    condition = var.log_analytics_workspace_id == null || try(startswith(
+      var.log_analytics_workspace_id,
+      "${var.workload_resource_group_id}/providers/Microsoft.OperationalInsights/workspaces/"
+    ), false)
+    error_message = "The monitoring workspace must belong to the workload resource group."
+  }
+}
+
 variable "github_oidc_subject_prefix" {
   description = "Exact repository sub_claim_prefix returned by the GitHub API."
   type        = string

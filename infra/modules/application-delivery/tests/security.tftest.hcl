@@ -104,3 +104,27 @@ run "reject_branch_subject" {
   }
   expect_failures = [var.github_oidc_subject_prefix]
 }
+
+run "monitoring_link_is_workspace_scoped" {
+  command = plan
+  variables {
+    log_analytics_workspace_id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.OperationalInsights/workspaces/law-statusboard-dev"
+  }
+  assert {
+    condition = (
+      azurerm_role_assignment.monitoring_link[0].scope == var.log_analytics_workspace_id &&
+      azurerm_role_assignment.monitoring_link[0].principal_id == azurerm_user_assigned_identity.github["network"].principal_id &&
+      toset(azurerm_role_definition.monitoring_link[0].permissions[0].actions) == toset(["Microsoft.OperationalInsights/workspaces/sharedKeys/action"]) &&
+      length(coalesce(azurerm_role_definition.monitoring_link[0].permissions[0].data_actions, [])) == 0
+    )
+    error_message = "Only the network identity may receive the single linked-workspace action on the exact workspace."
+  }
+}
+
+run "reject_unrelated_monitoring_workspace" {
+  command = plan
+  variables {
+    log_analytics_workspace_id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-unrelated/providers/Microsoft.OperationalInsights/workspaces/law-unrelated"
+  }
+  expect_failures = [var.log_analytics_workspace_id]
+}

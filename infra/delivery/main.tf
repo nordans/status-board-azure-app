@@ -28,6 +28,7 @@ module "application_delivery" {
   node_subnet_id             = data.azurerm_subnet.nodes.id
   control_plane_identity_id  = data.azurerm_user_assigned_identity.control_plane.id
   github_oidc_subject_prefix = var.github_oidc_subject_prefix
+  log_analytics_workspace_id = var.monitoring_enabled ? "${data.azurerm_resource_group.platform.id}/providers/Microsoft.OperationalInsights/workspaces/law-${var.name_prefix}-dev" : null
   tags = {
     application = "status-board"
     environment = "management"

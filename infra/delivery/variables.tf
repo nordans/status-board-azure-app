@@ -28,3 +28,9 @@ variable "github_oidc_subject_prefix" {
   description = "Exact immutable repository subject prefix returned by GitHub."
   type        = string
 }
+
+variable "monitoring_enabled" {
+  description = "Grant linked workspace authorization when the platform monitoring module is enabled."
+  type        = bool
+  default     = true
+}
