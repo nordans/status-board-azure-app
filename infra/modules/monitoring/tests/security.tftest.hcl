@@ -71,6 +71,10 @@ run "collection_and_access_boundaries" {
   assert {
     condition = (
       length(azurerm_monitor_alert_prometheus_rule_group.application.rule) == 4 &&
+      azurerm_monitor_alert_prometheus_rule_group.application.rule_group_enabled &&
+      azurerm_monitor_alert_prometheus_rule_group.platform.rule_group_enabled &&
+      alltrue([for rule in azurerm_monitor_alert_prometheus_rule_group.application.rule : rule.enabled]) &&
+      alltrue([for rule in azurerm_monitor_alert_prometheus_rule_group.platform.rule : rule.enabled]) &&
       alltrue([for rule in azurerm_monitor_alert_prometheus_rule_group.application.rule : rule.alert_resolution[0].auto_resolved])
     )
     error_message = "All four application alerts must resolve after recovery."
