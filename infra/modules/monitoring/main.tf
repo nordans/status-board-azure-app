@@ -154,6 +154,7 @@ resource "azurerm_monitor_alert_prometheus_rule_group" "application" {
   location            = var.location
   cluster_name        = var.cluster_name
   interval            = "PT1M"
+  rule_group_enabled  = true
   scopes              = [azurerm_monitor_workspace.metrics.id, var.cluster_id]
   tags                = var.tags
   dynamic "rule" {
@@ -180,10 +181,12 @@ resource "azurerm_monitor_alert_prometheus_rule_group" "platform" {
   location            = var.location
   cluster_name        = var.cluster_name
   interval            = "PT1M"
+  rule_group_enabled  = true
   scopes              = [azurerm_monitor_workspace.metrics.id, var.cluster_id]
   tags                = var.tags
   rule {
     alert      = "KubernetesNodeNotReady"
+    enabled    = true
     expression = "kube_node_status_condition{condition=\"Ready\",status=\"true\"} == 0"
     for        = "PT5M"
     severity   = 2
@@ -197,6 +200,7 @@ resource "azurerm_monitor_alert_prometheus_rule_group" "platform" {
   }
   rule {
     alert      = "StatusBoardDeploymentUnavailable"
+    enabled    = true
     expression = "kube_deployment_status_replicas_available{namespace=\"status-board\",deployment=\"status-board\"} < 1"
     for        = "PT2M"
     severity   = 2
