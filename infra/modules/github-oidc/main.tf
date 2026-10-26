@@ -1,4 +1,5 @@
 locals {
+  subscription_scope = "/subscriptions/${split("/", var.workload_resource_group_id)[2]}"
   environments = {
     plan  = "dev-infra-plan"
     apply = "dev-infra-apply"
@@ -126,6 +127,24 @@ resource "azurerm_role_definition" "deploy" {
 resource "azurerm_role_assignment" "deploy" {
   scope              = var.workload_resource_group_id
   role_definition_id = azurerm_role_definition.deploy.role_definition_resource_id
+  principal_id       = azurerm_user_assigned_identity.github["apply"].principal_id
+  principal_type     = "ServicePrincipal"
+}
+
+resource "azurerm_role_definition" "monitor_operations" {
+  name              = "${var.name_prefix}-monitor-operation-reader"
+  scope             = local.subscription_scope
+  assignable_scopes = [local.subscription_scope]
+  description       = "Read Azure Monitor asynchronous operation results for platform deployment."
+
+  permissions {
+    actions = ["Microsoft.Monitor/locations/operationResults/read"]
+  }
+}
+
+resource "azurerm_role_assignment" "monitor_operations" {
+  scope              = local.subscription_scope
+  role_definition_id = azurerm_role_definition.monitor_operations.role_definition_resource_id
   principal_id       = azurerm_user_assigned_identity.github["apply"].principal_id
   principal_type     = "ServicePrincipal"
 }

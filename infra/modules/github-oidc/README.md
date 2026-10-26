@@ -6,6 +6,8 @@ The planning identity receives Reader and the AKS Cluster User role on the devel
 
 Both identities receive Blob Data Contributor on the development state and private plan containers. Bootstrap state uses a separate container with no pipeline data role. A custom account-scoped role permits storage account read/write for temporary firewall rules, excluding deletion and key-listing. Storage account write can change other account settings; this permission is required by the public runner network model.
 
+Only Apply receives a separate subscription-scoped custom role containing `Microsoft.Monitor/locations/operationResults/read`. Azure Monitor workspace deletion returns a subscription-level asynchronous operation URL outside the workload resource group. This role permits reading those operation results across the subscription; it grants no workspace changes, metrics/log data access or role administration. Run the operator bootstrap plan/apply after adding this role, before a platform teardown.
+
 Inputs and their scopes are declared in `variables.tf`. `github_oidc_subject_prefix` must match the exact repository prefix returned by `gh api repos/OWNER/REPOSITORY/actions/oidc/customization/sub`. GitHub environment branch restrictions and required reviewers must be configured separately before enabling the workflow.
 
 Outputs: `plan_client_id`, `apply_client_id`. The module inherits AzureRM authentication from its root. See [deployment operations](../../README.md).
