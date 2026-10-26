@@ -47,23 +47,37 @@ module "key_vault" {
 }
 
 module "aks" {
-  source                 = "../../modules/aks"
-  name                   = "aks-${local.name}"
-  name_prefix            = local.name
-  resource_group_name    = data.azurerm_resource_group.platform.name
-  location               = var.location
-  tenant_id              = data.azurerm_client_config.current.tenant_id
-  subnet_id              = module.network.node_subnet_id
-  registry_id            = module.registry.id
-  kubernetes_version     = var.kubernetes_version
-  node_vm_size           = var.node_vm_size
-  node_count             = 2
-  api_authorized_cidrs   = var.aks_api_authorized_cidrs
-  admin_group_object_ids = var.aks_admin_group_object_ids
-  pod_cidr               = "10.244.0.0/16"
-  service_cidr           = "10.43.0.0/16"
-  dns_service_ip         = "10.43.0.10"
-  tags                   = local.tags
+  source                     = "../../modules/aks"
+  name                       = "aks-${local.name}"
+  name_prefix                = local.name
+  resource_group_name        = data.azurerm_resource_group.platform.name
+  location                   = var.location
+  tenant_id                  = data.azurerm_client_config.current.tenant_id
+  subnet_id                  = module.network.node_subnet_id
+  registry_id                = module.registry.id
+  kubernetes_version         = var.kubernetes_version
+  node_vm_size               = var.node_vm_size
+  node_count                 = 2
+  api_authorized_cidrs       = var.aks_api_authorized_cidrs
+  admin_group_object_ids     = var.aks_admin_group_object_ids
+  pod_cidr                   = "10.244.0.0/16"
+  service_cidr               = "10.43.0.0/16"
+  dns_service_ip             = "10.43.0.10"
+  tags                       = local.tags
+  monitoring_enabled         = var.monitoring_enabled
+  log_analytics_workspace_id = var.monitoring_enabled ? module.monitoring[0].log_analytics_workspace_id : null
+}
+
+module "monitoring" {
+  count               = var.monitoring_enabled ? 1 : 0
+  source              = "../../modules/monitoring"
+  name_prefix         = local.name
+  resource_group_name = data.azurerm_resource_group.platform.name
+  resource_group_id   = data.azurerm_resource_group.platform.id
+  location            = var.location
+  cluster_id          = module.aks.id
+  cluster_name        = module.aks.name
+  tags                = local.tags
 }
 
 module "workload_identity" {

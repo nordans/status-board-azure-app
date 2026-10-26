@@ -1,7 +1,38 @@
-mock_provider "azapi" {}
+mock_provider "azapi" {
+  mock_resource "azapi_resource" {
+    defaults = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.OperationalInsights/workspaces/law-statusboard-dev"
+    }
+  }
+}
 
 mock_provider "azurerm" {
   override_during = plan
+
+  mock_data "azurerm_resource_group" {
+    defaults = {
+      id   = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev"
+      name = "rg-statusboard-dev"
+    }
+  }
+
+  mock_resource "azurerm_monitor_workspace" {
+    defaults = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.Monitor/accounts/amw-statusboard-dev"
+    }
+  }
+
+  mock_resource "azurerm_monitor_data_collection_endpoint" {
+    defaults = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.Insights/dataCollectionEndpoints/dce-statusboard-dev"
+    }
+  }
+
+  mock_resource "azurerm_monitor_data_collection_rule" {
+    defaults = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-statusboard-dev/providers/Microsoft.Insights/dataCollectionRules/dcr-statusboard-dev"
+    }
+  }
 
   mock_resource "azurerm_kubernetes_cluster" {
     defaults = {
@@ -36,6 +67,17 @@ run "development_contract" {
   assert {
     condition     = output.kubernetes_namespace == "status-board" && output.kubernetes_service_account == "status-board"
     error_message = "The exported Kubernetes identity must match the deployment contract."
+  }
+}
+
+run "monitoring_can_be_disabled" {
+  command = plan
+  variables {
+    monitoring_enabled = false
+  }
+  assert {
+    condition     = output.monitoring == null
+    error_message = "Disabling monitoring must remove its module and exported endpoints."
   }
 }
 

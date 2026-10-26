@@ -1,0 +1,57 @@
+{
+  "groups": [
+    {
+      "name": "status-board",
+      "rules": [
+        {
+          "alert": "StatusBoardDown",
+          "expr": "up{job=\"status-board\"} == 0 or absent(up{job=\"status-board\"})",
+          "for": "2m",
+          "labels": {
+            "severity": "critical"
+          },
+          "annotations": {
+            "summary": "Status Board metrics target is unavailable.",
+            "description": "Check the application process, Service endpoints and collector connectivity."
+          }
+        },
+        {
+          "alert": "StatusBoardNotReady",
+          "expr": "status_board_ready{job=\"status-board\"} == 0",
+          "for": "2m",
+          "labels": {
+            "severity": "critical"
+          },
+          "annotations": {
+            "summary": "Status Board cannot read a valid API token.",
+            "description": "Check the mounted secret, CSI provider and Workload Identity. Do not print the token."
+          }
+        },
+        {
+          "alert": "StatusBoardHighErrorRate",
+          "expr": "(sum(rate(status_board_http_requests_total{job=\"status-board\",route!~\"/health/.*\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(status_board_http_requests_total{job=\"status-board\",route!~\"/health/.*\"}[5m])), 1e-9) > 0.05) and (sum(increase(status_board_http_requests_total{job=\"status-board\",route!~\"/health/.*\"}[5m])) >= 20)",
+          "for": "5m",
+          "labels": {
+            "severity": "warning"
+          },
+          "annotations": {
+            "summary": "More than 5% of application requests fail.",
+            "description": "At least 20 requests in 5 minutes are required. Inspect request logs by route and status."
+          }
+        },
+        {
+          "alert": "StatusBoardHighLatency",
+          "expr": "(histogram_quantile(0.95, sum by (le) (rate(status_board_http_request_duration_seconds_bucket{job=\"status-board\",route!~\"/health/.*\"}[5m]))) > 0.5) and (sum(increase(status_board_http_requests_total{job=\"status-board\",route!~\"/health/.*\"}[5m])) >= 20)",
+          "for": "5m",
+          "labels": {
+            "severity": "warning"
+          },
+          "annotations": {
+            "summary": "Status Board p95 request duration exceeds 500 ms.",
+            "description": "Check application resource pressure and slow routes. Low-traffic windows do not trigger this alert."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -43,6 +43,10 @@ def verify(hostname: str, expected_version: str) -> None:
             raise RuntimeError("Missing expected Strict-Transport-Security header")
         if path == "/api/status" and json.loads(body).get("version") != expected_version:
             raise RuntimeError("Public endpoint is not serving the deployed commit")
+    for path in ("/metrics", "/metrics/"):
+        code, _, _ = fetch(f"https://{hostname}{path}")
+        if code != 404:
+            raise RuntimeError("Metrics must not be exposed by the public Gateway")
 
 
 def main() -> None:

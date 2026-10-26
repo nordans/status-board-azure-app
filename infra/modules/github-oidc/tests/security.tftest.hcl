@@ -55,6 +55,9 @@ run "repository_and_environment_trust" {
     condition = (
       !contains(azurerm_role_definition.deploy.permissions[0].actions, "*") &&
       !contains(azurerm_role_definition.deploy.permissions[0].actions, "Microsoft.Authorization/roleAssignments/write") &&
+      !contains(azurerm_role_definition.deploy.permissions[0].actions, "Microsoft.OperationalInsights/workspaces/sharedKeys/action") &&
+      contains(azurerm_role_definition.deploy.permissions[0].actions, "Microsoft.Monitor/accounts/write") &&
+      contains(azurerm_role_definition.deploy.permissions[0].actions, "Microsoft.AlertsManagement/prometheusRuleGroups/delete") &&
       contains(azurerm_role_definition.deploy.permissions[0].actions, "Microsoft.ContainerRegistry/registries/operationStatuses/read") &&
       toset(azurerm_role_definition.backend_network.permissions[0].actions) == toset(["Microsoft.Storage/storageAccounts/read", "Microsoft.Storage/storageAccounts/write"])
     )

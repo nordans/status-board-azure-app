@@ -8,6 +8,12 @@ variable "subscription_id" {
   }
 }
 
+variable "monitoring_enabled" {
+  description = "Deploy monitoring workspaces, agents, collection rules and alerts with the platform."
+  type        = bool
+  default     = true
+}
+
 variable "name_prefix" {
   description = "Project prefix used in resource names."
   type        = string

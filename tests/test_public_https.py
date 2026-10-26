@@ -25,6 +25,8 @@ def test_public_probe_rejects_unexpected_destinations(hostname):
 def public_response(url):
     if url.startswith("http:"):
         return 301, {"Location": f"https://{HOST}/api/status"}, b""
+    if url.endswith(("/metrics", "/metrics/")):
+        return 404, {}, b""
     body = json.dumps({"version": VERSION}).encode() if url.endswith("/api/status") else b"ok"
     return 200, {"Strict-Transport-Security": "max-age=86400"}, body
 
@@ -43,10 +45,12 @@ def test_public_probe_checks_redirect_and_served_commit_without_credentials(monk
         f"https://{HOST}/",
         f"https://{HOST}/health/ready",
         f"https://{HOST}/api/status",
+        f"https://{HOST}/metrics",
+        f"https://{HOST}/metrics/",
     ]
 
 
-@pytest.mark.parametrize("failure", ["redirect", "version", "readiness", "hsts"])
+@pytest.mark.parametrize("failure", ["redirect", "version", "readiness", "hsts", "metrics"])
 def test_public_probe_rejects_incorrect_routing_or_deployment(monkeypatch, failure):
     def fetch(url):
         code, headers, body = public_response(url)
@@ -58,6 +62,8 @@ def test_public_probe_rejects_incorrect_routing_or_deployment(monkeypatch, failu
             code = 503
         if failure == "hsts":
             headers = {}
+        if failure == "metrics" and url.endswith("/metrics"):
+            code = 200
         return code, headers, body
 
     monkeypatch.setattr(verify_public_endpoint, "fetch", fetch)

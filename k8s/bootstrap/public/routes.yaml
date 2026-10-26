@@ -35,8 +35,17 @@ spec:
   rules:
     - matches:
         - path:
-            type: PathPrefix
+            type: Exact
             value: /
+        - path:
+            type: PathPrefix
+            value: /api
+        - path:
+            type: PathPrefix
+            value: /health
+        - path:
+            type: PathPrefix
+            value: /static
       filters:
         - type: ResponseHeaderModifier
           responseHeaderModifier:
