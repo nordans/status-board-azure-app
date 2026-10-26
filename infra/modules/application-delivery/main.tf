@@ -141,6 +141,7 @@ resource "azurerm_role_definition" "monitoring_link" {
     actions = [
       "Microsoft.OperationalInsights/workspaces/read",
       "Microsoft.OperationalInsights/workspaces/sharedKeys/action",
+      "Microsoft.OperationsManagement/solutions/read",
       "Microsoft.OperationsManagement/solutions/write",
     ]
   }
