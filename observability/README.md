@@ -74,9 +74,9 @@ CI runs `rule-tests.json` with the pinned Prometheus `promtool` image and valida
 
 ## Azure rollout
 
-The development root enables `monitoring_enabled` by default. Setting it to `false` omits the module and both AKS agents. Monitoring shares the platform state and is included in the same saved deployment/removal plans.
+The development root enables `monitoring_enabled` by default. Setting it to `false` omits the module and both AKS agents. Monitoring shares the platform state and is included in the same saved deployment/removal plans. The AKS logging workspace output depends on its ContainerInsights solution so that metadata exists before the cluster is created.
 
-The module creates Log Analytics and Azure Monitor workspaces, a metrics endpoint, metrics/log collection rules and cluster associations, control-plane diagnostic settings, and two Prometheus alert groups. AKS uses managed identity authentication for logs. No separate Azure Managed Grafana is provisioned.
+The module creates Log Analytics and Azure Monitor workspaces, ContainerInsights solution metadata, a metrics endpoint, metrics/log collection rules and cluster associations, control-plane diagnostic settings, and two Prometheus alert groups. AKS uses managed identity authentication for logs. No separate Azure Managed Grafana is provisioned.
 
 Log Analytics has 30-day retention, a 1 GB daily ingestion quota and disabled local/shared-key authentication. The quota is an ingestion guardrail, not a billing ceiling: enforcement can overshoot and stops log availability. Prometheus ingestion has separate charges. Workspace endpoints use public Azure networking with Entra authorization; Private Link is not configured.
 
@@ -84,8 +84,8 @@ Selected streams are ContainerLogV2, Kubernetes events and pod inventory. Invent
 
 Before deployment:
 
-1. An authorized subscription operator registers `Microsoft.Monitor`, `Microsoft.OperationalInsights`, `Microsoft.Insights` and `Microsoft.AlertsManagement` if needed. Provider auto-registration remains disabled.
-2. Plan the bootstrap root and review its platform-deploy custom role update. Apply that saved plan as the bootstrap operator before running the infrastructure workflow. It grants explicit monitoring resource read/write/delete actions in the existing workload resource group. Azure also requires `Microsoft.OperationalInsights/workspaces/sharedKeys/action` for linked authorization when creating the monitored AKS resource and log collection rule, even with managed identity ingestion. The Apply role includes this action in the workload resource group; it can retrieve workspace keys, although local/key authentication remains disabled. No wildcard actions, log-query permission or additional role delegation is added.
+1. An authorized subscription operator registers `Microsoft.Monitor`, `Microsoft.OperationalInsights`, `Microsoft.Insights`, `Microsoft.AlertsManagement` and `Microsoft.OperationsManagement` if needed. Provider auto-registration remains disabled.
+2. Plan the bootstrap root and review its platform-deploy custom role update. Apply that saved plan as the bootstrap operator before running the infrastructure workflow. It grants explicit monitoring resource read/write/delete actions in the existing workload resource group. Azure also requires `Microsoft.OperationalInsights/workspaces/sharedKeys/action` for linked authorization when creating the monitored AKS resource and log collection rule, even with managed identity ingestion. The Apply role includes this action and explicit ContainerInsights solution read/write/delete operations in the workload resource group; it can retrieve workspace keys, although local/key authentication remains disabled. No wildcard actions, log-query permission or additional role delegation is added.
 3. Resolve soft-deleted Key Vault name recovery from the previous teardown. Use the existing main-only workflow to review and apply a fresh platform plan. Monitoring is part of this same platform apply.
 4. Bootstrap application identities, token, CSI and public Gateway using the Kubernetes runbooks. Apply monitoring ConfigMaps with the operator's explicit kubeconfig/context:
 

@@ -34,6 +34,20 @@ resource "azurerm_monitor_workspace" "metrics" {
   tags                          = var.tags
 }
 
+resource "azurerm_log_analytics_solution" "containers" {
+  solution_name         = "ContainerInsights"
+  resource_group_name   = var.resource_group_name
+  location              = var.location
+  workspace_resource_id = azapi_resource.logs.id
+  workspace_name        = azapi_resource.logs.name
+  tags                  = var.tags
+
+  plan {
+    publisher = "Microsoft"
+    product   = "OMSGallery/ContainerInsights"
+  }
+}
+
 resource "azurerm_monitor_data_collection_endpoint" "metrics" {
   name                          = "dce-${var.name_prefix}"
   resource_group_name           = var.resource_group_name

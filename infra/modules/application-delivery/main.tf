@@ -138,7 +138,10 @@ resource "azurerm_role_definition" "monitoring_link" {
   description       = "Permit Log Analytics linked-resource authorization when updating the monitored AKS cluster."
 
   permissions {
-    actions = ["Microsoft.OperationalInsights/workspaces/sharedKeys/action"]
+    actions = [
+      "Microsoft.OperationalInsights/workspaces/sharedKeys/action",
+      "Microsoft.OperationsManagement/solutions/write",
+    ]
   }
 }
 

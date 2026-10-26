@@ -59,7 +59,7 @@ resource "azurerm_role_definition" "deploy" {
   name              = "${var.name_prefix}-platform-deploy"
   scope             = var.workload_resource_group_id
   assignable_scopes = [var.workload_resource_group_id]
-  description       = "Manage development platform resource types without secret data or role administration."
+  description       = "Manage development platform resources and monitoring links without role administration."
 
   permissions {
     actions = [
@@ -101,6 +101,9 @@ resource "azurerm_role_definition" "deploy" {
       "Microsoft.OperationalInsights/workspaces/write",
       "Microsoft.OperationalInsights/workspaces/delete",
       "Microsoft.OperationalInsights/workspaces/sharedKeys/action",
+      "Microsoft.OperationsManagement/solutions/read",
+      "Microsoft.OperationsManagement/solutions/write",
+      "Microsoft.OperationsManagement/solutions/delete",
       "Microsoft.Insights/dataCollectionEndpoints/read",
       "Microsoft.Insights/dataCollectionEndpoints/write",
       "Microsoft.Insights/dataCollectionEndpoints/delete",

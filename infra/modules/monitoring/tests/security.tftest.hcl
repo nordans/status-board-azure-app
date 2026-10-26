@@ -36,6 +36,15 @@ run "collection_and_access_boundaries" {
   command = plan
   assert {
     condition = (
+      azurerm_log_analytics_solution.containers.solution_name == "ContainerInsights" &&
+      azurerm_log_analytics_solution.containers.workspace_resource_id == azapi_resource.logs.id &&
+      azurerm_log_analytics_solution.containers.plan[0].publisher == "Microsoft" &&
+      azurerm_log_analytics_solution.containers.plan[0].product == "OMSGallery/ContainerInsights"
+    )
+    error_message = "Container Insights solution metadata must belong to this workspace and remain in platform state."
+  }
+  assert {
+    condition = (
       azapi_resource.logs.body.properties.features.disableLocalAuth &&
       !azapi_resource.logs.body.properties.features.enableLogAccessUsingOnlyResourcePermissions &&
       azapi_resource.logs.body.properties.retentionInDays == 30 &&
