@@ -139,6 +139,7 @@ resource "azurerm_role_definition" "monitoring_link" {
 
   permissions {
     actions = [
+      "Microsoft.OperationalInsights/workspaces/read",
       "Microsoft.OperationalInsights/workspaces/sharedKeys/action",
       "Microsoft.OperationsManagement/solutions/write",
     ]
