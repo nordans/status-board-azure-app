@@ -129,3 +129,23 @@ resource "azurerm_role_assignment" "identity_assign" {
   principal_id       = azurerm_user_assigned_identity.github["network"].principal_id
   principal_type     = "ServicePrincipal"
 }
+
+resource "azurerm_role_definition" "monitoring_link" {
+  count             = var.log_analytics_workspace_id == null ? 0 : 1
+  name              = "${var.name_prefix}-application-monitoring-link"
+  scope             = var.workload_resource_group_id
+  assignable_scopes = [var.workload_resource_group_id]
+  description       = "Permit Log Analytics linked-resource authorization when updating the monitored AKS cluster."
+
+  permissions {
+    actions = ["Microsoft.OperationalInsights/workspaces/sharedKeys/action"]
+  }
+}
+
+resource "azurerm_role_assignment" "monitoring_link" {
+  count              = var.log_analytics_workspace_id == null ? 0 : 1
+  scope              = var.log_analytics_workspace_id
+  role_definition_id = azurerm_role_definition.monitoring_link[0].role_definition_resource_id
+  principal_id       = azurerm_user_assigned_identity.github["network"].principal_id
+  principal_type     = "ServicePrincipal"
+}

@@ -100,6 +100,7 @@ resource "azurerm_role_definition" "deploy" {
       "Microsoft.OperationalInsights/workspaces/read",
       "Microsoft.OperationalInsights/workspaces/write",
       "Microsoft.OperationalInsights/workspaces/delete",
+      "Microsoft.OperationalInsights/workspaces/sharedKeys/action",
       "Microsoft.Insights/dataCollectionEndpoints/read",
       "Microsoft.Insights/dataCollectionEndpoints/write",
       "Microsoft.Insights/dataCollectionEndpoints/delete",

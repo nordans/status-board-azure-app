@@ -9,3 +9,6 @@ Both identities receive Blob Data Contributor on the development state and priva
 Inputs and their scopes are declared in `variables.tf`. `github_oidc_subject_prefix` must match the exact repository prefix returned by `gh api repos/OWNER/REPOSITORY/actions/oidc/customization/sub`. GitHub environment branch restrictions and required reviewers must be configured separately before enabling the workflow.
 
 Outputs: `plan_client_id`, `apply_client_id`. The module inherits AzureRM authentication from its root. See [deployment operations](../../README.md).
+
+
+Monitored AKS writes require Log Analytics linked authorization even when managed identity ingestion and disabled local authentication are configured. Terraform Apply has `Microsoft.OperationalInsights/workspaces/sharedKeys/action` in the workload group. The operator-managed delivery root separately grants the API network identity only this action on the exact Log Analytics workspace when monitoring is enabled. Publisher and application deployment identities receive no workspace grant. This action permits retrieving workspace keys; Terraform does not retrieve or export them, and the workspace rejects key-based authentication. Set `monitoring_enabled = false` in the delivery root when platform monitoring is disabled.
